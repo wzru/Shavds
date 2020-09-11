@@ -20,7 +20,7 @@ then
     lls=()
     for file in $@
     do
-        echo ${file}
+        echo "processing ${file}..."
         clang++ $file $optm -g -S -emit-llvm -o ${file%.*}.ll
         opt -load core/shavds.so -obfuscate < ${file%.*}.ll > ${file%.*}.bc
         llvm-dis ${file%.*}.bc -o ${file%.*}-obfuscate.ll
@@ -28,7 +28,9 @@ then
     done
     # echo ${lls[*]}
     # echo "file" ${file%.*}
-    llvm-link ${lls[*]} -S -o $(dirname $file)/merge.ll
+    merge="$(dirname $file)/merge.ll"
+    llvm-link ${lls[*]} -S -o $merge
+    echo "successfully generated ${merge} !"
 else
     echo $#
 fi

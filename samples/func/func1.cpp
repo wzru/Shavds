@@ -28,3 +28,8 @@ int e()
 {
     return 114514;
 }
+
+int main()
+{
+    return a()+e();
+}
