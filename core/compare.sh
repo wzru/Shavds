@@ -1,1 +1,1 @@
-opt -load ./shavds.so -compare < merge.ll > /dev/null
+opt -load shavds.so -compare < merge.ll > /dev/null

@@ -46,10 +46,10 @@ struct Obfuscator : public FunctionPass
     Obfuscator() : FunctionPass(ID) {}
     bool runOnFunction(Function& F) override
     {
-        errs() << "Obfuscator: ";
+        // errs() << "Obfuscator: ";
         std::string fileName = (F.getParent())->getSourceFileName();
         F.setName(fileName + SHAVDS + F.getName());
-        errs().write_escaped(F.getName()) << '\n';
+        // errs().write_escaped(F.getName()) << '\n';
         return false;
     }
 };
@@ -65,6 +65,7 @@ inline std::string systemOut(const std::string cmd)
     system(cmd.c_str());
     read(fd[0], buf, 1024);
     dup2(backfd, STDOUT_FILENO);  //恢复标准输出
+    if (buf[strlen(buf) - 1] == '\n') buf[strlen(buf) - 1] = '\0';
     return std::string(buf);
 }
 
@@ -78,12 +79,14 @@ struct Comparator : public ModulePass
         std::vector<llvm::Module::iterator> mi;
         std::vector<u32>                    x, a, l;
         std::vector<std::string>            n;
-        void push(const llvm::Module::iterator& i, const std::string& funcName)
+        void push(const llvm::Module::iterator& i,
+                  const std::string&            funcName,
+                  int                           line)
         {
             mi.push_back(i);
             x.push_back(0);
             a.push_back(0);
-            l.push_back(0);
+            l.push_back(line);
             n.push_back(funcName);
         }
     };
@@ -116,23 +119,20 @@ struct Comparator : public ModulePass
         //    && a->get()->get
         // a->get()->getContext() == b->get()->getContext();
     }
+    bool startWith(const std::string& s1, const std::string& s2)
+    {
+        return s1.compare(0, s2.size(), s2) == 0;
+    }
+    bool isIgnored(const std::string& name)
+    {
+        return startWith(name, "_GLOBAL") || name == "main";
+    }
     double LCS(llvm::Module::iterator& a, llvm::Module::iterator& b)
     {
         int   n = a->getInstructionCount(), m = b->getInstructionCount();
         int** f = new int*[n + 1];
         for (int i = 0; i <= n; ++i) { f[i] = new int[m + 1](); }
-        int x = 1;
-        // for (auto i = a->op_begin(); i != a->op_end(); ++i, ++x) {
-        //     int y = 1;
-        //     for (auto j = b->op_begin(); j != b->op_end(); ++j, ++y) {
-        //         std::cerr << "opi=" << i->getOperandNo()
-        //                   << " opj=" << j->getOperandNo() << '\n';
-        //         if (i->getOperandNo() == j->getOperandNo())
-        //             f[x][y] = f[x - 1][y - 1] + 1;
-        //         else
-        //             f[x][y] = std::max(f[x][y - 1], f[x - 1][y]);
-        //     }
-        // }
+        int                                      x = 1;
         std::vector<llvm::Function::op_iterator> u, v;
         for (auto i = a->begin(); i != a->end(); ++i)
             for (auto j = i->begin(); j != i->end(); ++j)
@@ -152,23 +152,15 @@ struct Comparator : public ModulePass
                     f[i + 1][j + 1] = std::max(f[i][j + 1], f[i + 1][j]);
             }
         }
-        // for (auto i = a->begin(); i != a->end(); ++i, ++x) {
-        //     int y = 1;
-        //     for (auto j = b->begin(); j != b->end(); ++j, ++y)
-        //         if (cmpBasicBlocks(i, j))
-        //             f[x][y] = f[x - 1][y - 1] + 1;
-        //         else
-        //             f[x][y] = std::max(f[x][y - 1], f[x - 1][y]);
-        // }
-        std::cerr << "-------" << f[n][m] << ',' << n << ',' << m << '\n';
+        // std::cerr << "-------" << f[n][m] << ',' << n << ',' << m << '\n';
         return (double)f[n][m] / std::min(n, m);
     }
     File p, q;
     Comparator() : ModulePass(ID) {}
     bool runOnModule(Module& M) override
     {
-        errs() << "Module Name: ";
-        errs().write_escaped(M.getName()) << '\n';
+        // errs() << "Module Name: ";
+        // errs().write_escaped(M.getName()) << '\n';
         for (auto i = M.functions().begin(); i != M.functions().end(); ++i) {
             std::string fullName = i->getName();
             size_t      pos      = fullName.find(SHAVDS);
@@ -178,36 +170,34 @@ struct Comparator : public ModulePass
                     pos + SHAVDS.size(), fullName.size() - pos - SHAVDS.size());
                 std::string origName =
                     systemOut(std::string("c++filt ") + funcName);
-                errs() << "Original Name=" << origName << '\n';
+                // std::string origName = i->getSubprogram()->getName();
+                if (isIgnored(origName)) continue;
+                // errs() << "Original Name=" << origName << '\n';
                 if (p.name == "" || p.name == fileName) {
                     p.name = fileName;
-                    p.push(i, origName);
+                    p.push(i, origName, i->getSubprogram()->getLine());
+                    // errs() << "name=" << i->getSubprogram()->getName() <<
+                    // '\n'; errs() << "line=" << i->getSubprogram()->getLine()
+                    // << '\n';
                 }
                 else {
                     q.name = fileName;
-                    q.push(i, origName);
+                    q.push(i, origName, i->getSubprogram()->getLine());
                 }
-                // errs() << fileName << " Operand1: ";
-                // auto F = (*i).getFunction();
-                // for()
-                // for (auto j = i->op_begin(); j != i->op_end(); ++j) {
-                //     errs() << j->get() << '\n';
-                //     auto v = j->get();
-                //     v->printAsOperand(errs());
+                // errs() << fileName << " Operand: ";
+                // errs() << "name=" << i->getName() << '\n';
+                // errs() << "inst_cnt=" << i->getInstructionCount() << '\n';
+                // for (auto j = i->begin(); j != i->end(); ++j) {
+                //     j->print(errs());
                 // }
-                errs() << fileName << " Operand: ";
-                errs() << "name=" << i->getName() << '\n';
-                errs() << "inst_cnt=" << i->getInstructionCount() << '\n';
-                for (auto j = i->begin(); j != i->end(); ++j) {
-                    j->print(errs());
-                }
             }
         }
         for (int i = 0; i < p.mi.size(); ++i)
             for (int j = 0; j < p.mi.size(); ++j) {
                 double result = LCS(p.mi[i], p.mi[j]);
-                std::cerr << p.n[i] << " and " << q.n[j] << " are "
-                          << result * 100 << "% similar\n";
+                std::cerr << p.n[i] << " in " << p.name << ":" << p.l[i] << "\n"
+                          << q.n[j] << " in " << q.name << ":" << q.l[j]
+                          << "\n\tare " << result * 100 << "% similar!\n";
             }
         return false;
     }
@@ -222,7 +212,7 @@ char Comparator::ID = 2;
 // Register for opt
 static RegisterPass<Hello>      hello("hello", "Hello World Pass");
 static RegisterPass<Obfuscator> obfuscate("obfuscate", "Prefix Obfuscate Pass");
-static RegisterPass<Comparator> compare("compare", "Compare Merge IR Pass");
+static RegisterPass<Comparator> compare("compare", "Compare Merged IR Pass");
 
 // Register for clang
 static RegisterStandardPasses Y(PassManagerBuilder::EP_EarlyAsPossible,
