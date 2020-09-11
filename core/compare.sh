@@ -1,1 +1,0 @@
-opt -load shavds.so -compare < merge.ll > /dev/null
