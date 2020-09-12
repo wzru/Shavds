@@ -20,11 +20,19 @@ cd Shavds/
 
 2. draw
 
+作call graph图
+
+```shell
+cd Shavds/
+./core/obfuscate-merge.sh -O0 ./samples/func/*.cpp
+./core/draw.sh callgraph ./samples/func/func1.ll
+```
+
 作cfg图
 
 ```shell
 cd Shavds/
 ./core/obfuscate-merge.sh -O0 ./samples/func/*.cpp
-./core/draw.sh ./samples/func/merge.ll
+./core/draw.sh cfg ./samples/func/func1.ll
 ```
 

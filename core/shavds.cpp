@@ -192,27 +192,30 @@ struct CfgComparator : public FunctionPass
     CfgComparator() : FunctionPass(ID) {}
     void runToposort(const Function& F)
     {
-        errs() << "Topological sort of " << F.getName() << ":\n";
-        // Initialize the color map by marking all the vertices white.
-        for (Function::const_iterator I = F.begin(), IE = F.end(); I != IE;
-             ++I) {
-            ColorMap[&*I] = WHITE;
-        }
-        // The BB graph has a single entry vertex from which the other BBs
-        // should be discoverable - the function entry block.
-        bool success = recursiveDFSToposort(&F.getEntryBlock());
-        if (success) {
-            // Now we have all the BBs inside SortedBBs in reverse topological
-            // order.
-            for (BBVector::const_reverse_iterator RI = SortedBBs.rbegin(),
-                                                  RE = SortedBBs.rend();
-                 RI != RE; ++RI) {
-                errs() << "  " << (*RI)->getName() << "\n";
-            }
-        }
-        else {
-            errs() << "  Sorting failed\n";
-        }
+        // errs() << "Topological sort of " << F.getName() << ":\n";
+        // // Initialize the color map by marking all the vertices white.
+        // for (Function::const_iterator I = F.begin(), IE = F.end(); I != IE;
+        //      ++I) {
+        //     ColorMap[&*I] = WHITE;
+        // }
+        // // The BB graph has a single entry vertex from which the other BBs
+        // // should be discoverable - the function entry block.
+        // // F.end()
+        // bool success = recursiveDFSToposort(F);
+        // if (success) {
+        //     errs() << F.getName() << " has success!\n";
+        //     // Now we have all the BBs inside SortedBBs in reverse
+        //     topological
+        //     // order.
+        //     for (BBVector::const_reverse_iterator RI = SortedBBs.rbegin(),
+        //                                           RE = SortedBBs.rend();
+        //          RI != RE; ++RI) {
+        //         errs() << "  " << (*RI)->getName() << "\n";
+        //     }
+        // }
+        // else {
+        //     errs() << "  Sorting failed\n";
+        // }
     }
 
   private:
@@ -228,58 +231,61 @@ struct CfgComparator : public FunctionPass
     // Helper function to recursively run topological sort from a given BB.
     // Returns true if the sort succeeded and false otherwise; topological sort
     // may fail if, for example, the graph is not a DAG (detected a cycle).
-    bool recursiveDFSToposort(const BasicBlock* BB)
+    bool recursiveDFSToposort(Function& F)
     {
-        ColorMap[BB] = GREY;
+        // ColorMap[BB] = GREY;
+        // auto ori     = BB;
+        // F.begin()->
         // For demonstration, using the lowest-level APIs here. A BB's
-        // successors are determined by looking at its terminator instruction.
-        const auto* TInst = BB->getTerminator();
-        errs() << "num=" << TInst->getNumSuccessors() << '\n';
-        for (unsigned I = 0, NSucc = TInst->getNumSuccessors(); I < NSucc;
-             ++I) {
-            BasicBlock* Succ      = TInst->getSuccessor(I);
-            Color       SuccColor = ColorMap[Succ];
-            if (SuccColor == WHITE) {
-                if (!recursiveDFSToposort(Succ)) return false;
-            }
-            else if (SuccColor == GREY) {
-                // This detects a cycle because grey vertices are all ancestors
-                // of the currently explored vertex (in other words, they're "on
-                // the stack").
-                errs() << "  Detected cycle: edge from " << BB->getName()
-                       << " to " << Succ->getName() << "\n";
-                return false;
-            }
-        }
-        // This BB is finished (fully explored), so we can add it to the vector.
-        ColorMap[BB] = BLACK;
-        SortedBBs.push_back(BB);
+        // successors are determined by looking at its terminator
+        // instruction.
+        //     for (BB = F.begin(); BB != F.end(); ++BB)
+        // {
+        //     const auto* TInst = BB->getTerminator();
+        //     errs() << "num=" << TInst->getNumSuccessors() << '\n';
+        //     for (unsigned I = 0, NSucc = TInst->getNumSuccessors(); I <
+        //     NSucc;
+        //          ++I) {
+        //         BasicBlock* Succ      = TInst->getSuccessor(I);
+        //         Color       SuccColor = ColorMap[Succ];
+        //         if (SuccColor == WHITE) {
+        //             if (!recursiveDFSToposort(Succ)) return false;
+        //         }
+        //         else if (SuccColor == GREY) {
+        //             // This detects a cycle because grey vertices are all
+        //             // ancestors of the currently explored vertex (in
+        //             other
+        //             // words, they're "on the stack").
+        //             errs() << "  Detected cycle: edge from " <<
+        //             BB->getName()
+        //                    << " to " << Succ->getName() << "\n";
+        //             return false;
+        //         }
+        //     }
+        // }
+        // This BB is finished (fully explored), so we can add it to the
+        // vector.
+        //     ColorMap[ori] = BLACK;
+        // SortedBBs.push_back(ori);
         return true;
     }
     bool runOnFunction(Function& F)
     {
-        errs() << "toposort begins...\n";
-        // if (AnalysisKind == "-topo") {
-        runToposort(F);
+        errs() << "toposort begins...\n" << F.getName() << '\n';
+        // runToposort(F);
+        // for(auto i = F.use_begin(); i!=F.use_end(); ++i)
+        // {
+        //     i->get()->print(errs());
         // }
-        // else if (AnalysisKind == "-po") {
-        //     // Use LLVM's post-order iterator to produce a reverse
-        //     topological
-        //     // sort. Note that this doesn't detect cycles so if the graph is
-        //     not
-        //     // a DAG, the result is not a true topological sort.
-        //     errs() << "Basic blocks of " << F.getName() << " in
-        //     post-order:\n"; for (po_iterator<BasicBlock*> I  =
-        //     po_begin(&F.getEntryBlock()),
-        //                                   IE = po_end(&F.getEntryBlock()) ;
-        //          I != IE; ++I) {
-        //         errs() << "  " << (*I)->getName() << "\n";
-        //     }
-        // }
-        return false;
+        for (auto i = F.begin(); i != F.end(); ++i)
+        // for(auto j = i->begin(); j!=i->end(); ++j)
+        {
+            auto t = i->getTerminator();
+            u32  n = t->getNumSuccessors();
+            errs() << n << '\n';
+        }
+        return 0;
     }
-    // The address of this member is used to uniquely identify the class. This
-    // is used by LLVM's own RTTI mechanism.
 };
 
 }  // namespace
