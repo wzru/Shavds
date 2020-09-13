@@ -1,4 +1,11 @@
 #!/bin/bash
+RED='\e[1;41m'  # 红
+GREEN='\e[1;42m'  # 绿
+YELLOW='\e[43;37m'  # 黄
+BLUE='\e[1;44m'  # 蓝
+PINK='\e[1;45m'  # 粉红
+RES='\e[0m'  # 清除颜色
+
 if [ $# -ge 2 ]
 then
     optm=-O3
@@ -7,10 +14,9 @@ then
         case $opt in
             O)
                 optm=-O$OPTARG
-                # echo "optm="$optm
                 ;;
             ?)
-                echo "there is some unrecognized parameters."
+                echo -e "there is some ${RED}unrecognized${RES} parameters"
                 exit 1
                 ;;
         esac
@@ -20,17 +26,31 @@ then
     lls=()
     for file in $@
     do
-        echo "processing ${file}..."
+        echo "processing '${file}'..."
         clang++ $file $optm -g -S -emit-llvm -o ${file%.*}.ll
         opt -load core/shavds.so -obfuscate < ${file%.*}.ll > ${file%.*}.bc
         llvm-dis ${file%.*}.bc -o ${file%.*}-obfuscate.ll
+        rm ${file%.*}.bc
+        if [ $? -eq 0 ]
+        then
+            echo -e "${GREEN}successfully${RES} generated '${BLUE}${file%.*}.ll${RES}'"
+        fi
         lls+=(${file%.*}-obfuscate.ll)
     done
     # echo ${lls[*]}
     # echo "file" ${file%.*}
     merge="$(dirname $file)/merge.ll"
     llvm-link ${lls[*]} -S -o $merge
-    echo "successfully generated ${merge} !"
+    if [ $? -eq 0 ]
+    then
+        echo -e "${GREEN}successfully${RES} generated '${BLUE}${merge}${RES}'"
+    fi
+    # 删除obfuscate文件
+    for file in $@
+    do
+        rm ${file%.*}-obfuscate.ll
+    done
+
 else
-    echo $#
+    echo -e "${PINK}usage: obfuscate-merge.sh -O[0 | 1 | 2 | 3] [*.c | *.cpp]...${RES}"
 fi
