@@ -31,6 +31,7 @@
 #include <iostream>
 #include <iterator>
 #include <new>
+#include <queue>
 #include <type_traits>
 #include <typeinfo>
 #include <unistd.h>
@@ -39,23 +40,17 @@
 
 using namespace llvm;
 
-using u32 = uint32_t;
+using u32  = uint32_t;
+using VOPI = std::vector<llvm::Function::op_iterator>;
 
-struct FuncInfo
-{
-    std::string            name;
-    llvm::Module::iterator mi;
-    u32                    line;
-    FuncInfo() = default;
-    FuncInfo(const std::string&            name,
-             const llvm::Module::iterator& mi,
-             u32                           line)
-        : name(name), mi(mi), line(line)
-    {
-    }
-};
+const std::string RED    = "\e[1;41m";   //红
+const std::string GREEN  = "\e[1;42m";   //绿
+const std::string YELLOW = "\e[43;37m";  //黄
+const std::string BLUE   = "\e[1;44m";   //蓝
+const std::string PINK   = "\e[1;45m";   //粉红
+const std::string RESET  = "\e[0m";      //清除颜色
 
-const std::string SHAVDS = "__SHAVDS__";
+const std::string SHAVDS = "__SHAVDS_by_WZR__";
 
 inline std::string systemOut(const std::string cmd)
 {
@@ -72,24 +67,40 @@ inline std::string systemOut(const std::string cmd)
     return std::string(buf);
 }
 
-bool cmpOp(const llvm::Function::op_iterator& a,
-           const llvm::Function::op_iterator& b)
+inline bool cmpOp(const llvm::Function::op_iterator& a, const llvm::Function::op_iterator& b)
 {
-    return a->get()->getType() == b->get()->getType() &&
-           a->get()->getValueID() == b->get()->getValueID() &&
-           a->get()->getNumUses() == b->get()->getNumUses() &&
-           a->get()->getValueName() == b->get()->getValueName() &&
+    return a->get()->getType() == b->get()->getType() && a->get()->getValueID() == b->get()->getValueID() &&
+           a->get()->getNumUses() == b->get()->getNumUses() && a->get()->getValueName() == b->get()->getValueName() &&
            a->get()->getName() == b->get()->getName() &&
-           a->get()->getRawSubclassOptionalData() ==
-               b->get()->getRawSubclassOptionalData();
+           a->get()->getRawSubclassOptionalData() == b->get()->getRawSubclassOptionalData();
 }
 
-bool startWith(const std::string& s1, const std::string& s2)
+inline u32 LCS(const VOPI& u, const VOPI& v)
+{
+    int   n = u.size(), m = v.size();
+    u32** f = new u32*[n + 1];
+    for (int i = 0; i <= n; ++i) { f[i] = new u32[m + 1](); }
+    for (auto i = 0; i < n; ++i) {
+        for (auto j = 0; j < m; ++j) {
+            if (cmpOp(u[i], v[j]))
+                f[i + 1][j + 1] = f[i][j] + 1;
+            else
+                f[i + 1][j + 1] = std::max(f[i][j + 1], f[i + 1][j]);
+        }
+    }
+    u32 ans = f[n][m];
+    for (int i = 0; i <= n; ++i) { delete[] f[i]; }
+    delete[] f;
+    // std::cerr << "n=" << n << " m=" << m << " ans=" << ans << "\n";
+    return ans;
+}
+
+inline bool startWith(const std::string& s1, const std::string& s2)
 {
     return s1.compare(0, s2.size(), s2) == 0;
 }
 
-bool isIgnored(const std::string& name)
+inline bool isIgnored(const std::string& name)
 {
     return startWith(name, "_GLOBAL") || name == "main";
 }
@@ -124,173 +135,188 @@ struct Obfuscator : public FunctionPass
 //比较若干文件中的所有函数IR相似性
 struct FunComparator : public ModulePass
 {
+    struct FuncInfo
+    {
+        std::string            name;
+        llvm::Module::iterator mi;
+        u32                    line;
+        FuncInfo() = default;
+        FuncInfo(const std::string& name, const llvm::Module::iterator& mi, u32 line) : name(name), mi(mi), line(line)
+        {
+        }
+    };
     static char                                  ID;
     std::map<std::string, std::vector<FuncInfo>> mfi;
     FunComparator() : ModulePass(ID) {}
-    u32 LCS(llvm::Module::iterator& a, llvm::Module::iterator& b)
-    {
-        int   n = a->getInstructionCount(), m = b->getInstructionCount();
-        u32** f = new u32*[n + 1];
-        for (int i = 0; i <= n; ++i) { f[i] = new u32[m + 1](); }
-        int                                      x = 1;
-        std::vector<llvm::Function::op_iterator> u, v;
-        for (auto i = a->begin(); i != a->end(); ++i)
-            for (auto j = i->begin(); j != i->end(); ++j)
-                for (auto k = j->op_begin(); k != j->op_end(); ++k)
-                    u.push_back(k);
-        for (auto i = b->begin(); i != b->end(); ++i)
-            for (auto j = i->begin(); j != i->end(); ++j)
-                for (auto k = j->op_begin(); k != j->op_end(); ++k)
-                    v.push_back(k);
-        for (auto i = 0; i < n; ++i) {
-            for (auto j = 0; j < m; ++j) {
-                if (cmpOp(u[i], v[j]))
-                    f[i + 1][j + 1] = f[i][j] + 1;
-                else
-                    f[i + 1][j + 1] = std::max(f[i][j + 1], f[i + 1][j]);
-            }
-        }
-        // for (int i = 0; i <= n; ++i) { delete[] f[i]; }
-        // delete[] f;
-        return f[n][m];
-    }
     double RepRate(llvm::Module::iterator& a, llvm::Module::iterator& b)
     {
-        return (double)LCS(a, b) /
-               std::min(a->getInstructionCount(), b->getInstructionCount());
+        VOPI u, v;
+        for (auto i = a->begin(); i != a->end(); ++i)
+            for (auto j = i->begin(); j != i->end(); ++j)
+                for (auto k = j->op_begin(); k != j->op_end(); ++k) u.push_back(k);
+        for (auto i = b->begin(); i != b->end(); ++i)
+            for (auto j = i->begin(); j != i->end(); ++j)
+                for (auto k = j->op_begin(); k != j->op_end(); ++k) v.push_back(k);
+        return (double)LCS(u, v) / std::min(u.size(), v.size());
     }
+    // double RepRate(llvm::Module::iterator& a, llvm::Module::iterator& b)
+    // {
+    //     return (double)FuncLcs(a, b) / std::min(a->getInstructionCount(), b->getInstructionCount());
+    // }
     bool runOnModule(Module& M) override
     {
-        for (auto i = M.functions().begin(); i != M.functions().end();
-             ++i) {  //遍历模块中的函数
+        for (auto i = M.functions().begin(); i != M.functions().end(); ++i) {  //遍历模块中的函数
             std::string fullName = i->getName();
             size_t      pos      = fullName.find(SHAVDS);
             if (pos != std::string::npos) {  //如果是目标函数
                 std::string fileName = fullName.substr(0, pos);
-                std::string funcName = fullName.substr(
-                    pos + SHAVDS.size(), fullName.size() - pos - SHAVDS.size());
-                std::string origName =
-                    systemOut(std::string("c++filt ") + funcName);
-                std::cerr << "funcName=" << funcName << "\n";
+                std::string funcName = fullName.substr(pos + SHAVDS.size(), fullName.size() - pos - SHAVDS.size());
+                std::string origName = systemOut(std::string("c++filt ") + funcName);
+                // std::cerr << "funcName=" << funcName << "\n";
                 if (isIgnored(origName)) continue;
-                mfi[fileName].push_back(
-                    FuncInfo(origName, i, i->getSubprogram()->getLine()));
+                mfi[fileName].push_back(FuncInfo(origName, i, i->getSubprogram()->getLine()));
+                // std::cerr << "name=" << mfi[fileName][0].name << "\n";
             }
         }
-        std::cerr << "ready to compare...\n";
+        // std::cerr << "ready to compare...\n";
+        // std::map<std::string, std::vector<FuncInfo>> mfi;
         for (auto i = mfi.begin(); i != mfi.end(); ++i) {
             auto tmp = i;
             for (auto j = ++tmp; j != mfi.end(); ++j) {
-                std::cerr << "Now compare " << i->first << " and " << j->first
-                          << "\n";
-                for (auto ii : i->second)
-                    for (auto jj : j->second) {
-                        double res = RepRate(ii.mi, jj.mi);
-                        std::cerr
-                            << ii.name << "(" << ii.mi->getInstructionCount()
-                            << " insts) in " << i->first << ":" << ii.line
-                            << "\n"
-                            << jj.name << "(" << jj.mi->getInstructionCount()
-                            << " insts) in " << j->first << ":" << jj.line
-                            << "\n\tare " << res * 100 << "% similar!\n";
+                // std::cerr << "Now compare " << i->first << " and " << j->first << "\n";
+                for (auto i1 : i->second)
+                    for (auto j1 : j->second) {
+                        double res = RepRate(i1.mi, j1.mi);
+                        std::cerr << GREEN << i1.name << RESET << " (" << i1.mi->getInstructionCount()
+                                  << " instructions) in " << BLUE << i->first << ":" << i1.line << RESET << "\n"
+                                  << GREEN << j1.name << RESET << " (" << j1.mi->getInstructionCount()
+                                  << " instructions) in " << BLUE << j->first << ":" << j1.line << RESET << "\n\tare "
+                                  << RED << res * 100 << "% similar!" << RESET << "\n";
                     }
             }
         }
-        // for (int i = 0; i < p.mi.size(); ++i)
-        //     for (int j = 0; j < p.mi.size(); ++j) {
-        //         double result = LCS(p.mi[i], p.mi[j]);
-        //         std::cerr << p.n[i] << " in " << p.name << ":" << p.l[i] <<
-        //         "\n"
-        //                   << q.n[j] << " in " << q.name << ":" << q.l[j]
-        //                   << "\n\tare " << result * 100 << "% similar!\n";
-        //     }
         return false;
     }
 };
 
 struct CfgComparator : public ModulePass
 {
-  public:
-    static char ID;
-    std::string AnalysisKind = "-topo";
-    CfgComparator() : ModulePass(ID) {}
-    void runToposort(const Function& F)
+    struct FuncCfg
     {
-        errs() << "Topological sort of " << F.getName() << ":\n";
-        // Initialize the color map by marking all the vertices white.
-        for (Function::const_iterator I = F.begin(), IE = F.end(); I != IE;
-             ++I) {
-            ColorMap[&*I] = WHITE;
-        }
-        // The BB graph has a single entry vertex from which the other BBs
-        // should be discoverable - the function entry block.
-        bool success = recursiveDFSToposort(&F.getEntryBlock());
-        if (success) {
-            // Now we have all the BBs inside SortedBBs in reverse topological
-            // order.
-            errs() << "toposort size=" << SortedBBs.size() << "\n";
-            for (BBVector::const_reverse_iterator RI = SortedBBs.rbegin(),
-                                                  RE = SortedBBs.rend();
-                 RI != RE; ++RI) {
-                errs() << "name=" << (*RI)->getName() << "\n";
-            }
-        }
-        else {
-            errs() << "  Sorting failed\n";
-        }
-    }
-
-  private:
+        std::string              name;
+        llvm::Module::iterator   mi;
+        u32                      line;
+        std::vector<BasicBlock*> bb;
+        FuncCfg() = default;
+        FuncCfg(const std::string& name, llvm::Module::iterator mi, u32 line) : name(name), mi(mi), line(line) {}
+    };
+    static char                                 ID;
+    std::map<std::string, std::vector<FuncCfg>> mfi;
+    typedef decltype(mfi["123"].rbegin())       RIT;
     enum Color { WHITE, GREY, BLACK };
     // Color marks per vertex (BB).
-    typedef DenseMap<const BasicBlock*, Color> BBColorMap;
+    typedef DenseMap<BasicBlock*, Color> BBColorMap;
     // Collects vertices (BBs) in "finish" order. The first finished vertex is
     // first, and so on.
-    typedef SmallVector<const BasicBlock*, 32> BBVector;
-    BBColorMap                                 ColorMap;
-    BBVector                                   SortedBBs;
+    typedef SmallVector<BasicBlock*, 32> BBVector;
+    BBColorMap                           ColorMap;
+    BBVector                             SortedBBs;
 
+    CfgComparator() : ModulePass(ID) {}
+    void Toposort(Function& F, RIT it)
+    {
+        // errs() << "Topological sort of " << F.getName() << ":\n";
+        // Initialize the color map by marking all the vertices white.
+        for (auto I = F.begin(), IE = F.end(); I != IE; ++I) { ColorMap[&*I] = WHITE; }
+        // The BB graph has a single entry vertex from which the other BBs
+        // should be discoverable - the function entry block.
+        bool success = DoToposort(&F.getEntryBlock(), it);
+        // if (success) {
+        //     // Now we have all the BBs inside SortedBBs in reverse topological
+        //     // order.
+        //     errs() << "toposort size=" << SortedBBs.size() << "\n";
+        //     for (BBVector::const_reverse_iterator RI = SortedBBs.rbegin(), RE = SortedBBs.rend(); RI != RE; ++RI) {
+        //         errs() << "name=" << (*RI)->getName() << "\n";
+        //     }
+        // }
+        // else {
+        //     errs() << "  Sorting failed\n";
+        // }
+    }
     // Helper function to recursively run topological sort from a given BB.
     // Returns true if the sort succeeded and false otherwise; topological sort
     // may fail if, for example, the graph is not a DAG (detected a cycle).
-    bool recursiveDFSToposort(const BasicBlock* BB)
+    bool DoToposort(BasicBlock* BB, RIT it)
     {
         ColorMap[BB] = GREY;
         // For demonstration, using the lowest-level APIs here. A BB's
         // successors are determined by looking at its terminator instruction.
-        const auto* TInst = BB->getTerminator();
-        errs() << BB->getParent()->getName();
-        errs() << " num=" << TInst->getNumSuccessors() << '\n';
-        for (unsigned I = 0, NSucc = TInst->getNumSuccessors(); I < NSucc;
-             ++I) {
+        auto* TInst = BB->getTerminator();
+        // errs() << BB->getParent()->getName();
+        // errs() << " num=" << TInst->getNumSuccessors() << '\n';
+        for (unsigned I = 0, NSucc = TInst->getNumSuccessors(); I < NSucc; ++I) {
             BasicBlock* Succ      = TInst->getSuccessor(I);
             Color       SuccColor = ColorMap[Succ];
             if (SuccColor == WHITE) {
-                if (!recursiveDFSToposort(Succ)) return false;
+                if (!DoToposort(Succ, it)) return false;
             }
             else if (SuccColor == GREY) {
                 // This detects a cycle because grey vertices are all ancestors
                 // of the currently explored vertex (in other words, they're "on
                 // the stack").
-                errs() << "  Detected cycle: edge from " << BB->getName()
-                       << " to " << Succ->getName() << "\n";
+                errs() << "  Detected cycle: edge from " << BB->getName() << " to " << Succ->getName() << "\n";
                 return false;
             }
         }
         // This BB is finished (fully explored), so we can add it to the vector.
         ColorMap[BB] = BLACK;
         SortedBBs.push_back(BB);
+        it->bb.push_back(BB);
         return true;
     }
+
     bool runOnModule(Module& M)
     {
-        errs() << "toposort begins...\n";
-        // if (AnalysisKind == "-topo") {
-
+        for (auto i = M.functions().begin(); i != M.functions().end(); ++i) {  //遍历模块中的函数
+            std::string fullName = i->getName();
+            size_t      pos      = fullName.find(SHAVDS);
+            if (pos != std::string::npos) {  //如果是目标函数
+                std::string fileName = fullName.substr(0, pos);
+                std::string funcName = fullName.substr(pos + SHAVDS.size(), fullName.size() - pos - SHAVDS.size());
+                std::string origName = systemOut(std::string("c++filt ") + funcName);
+                if (isIgnored(origName)) continue;
+                mfi[fileName].push_back(FuncCfg(origName, i, i->getSubprogram()->getLine()));
+                Toposort(*i, mfi[fileName].rbegin());
+            }
+        }
+        // for (auto i : mfi) {
+        //     for (auto j : i.second) {
+        //         for (auto k : j.bb) { fprintf(stderr, "%s %s num=%zu\n", i.first.c_str(), j.name.c_str(), k->size()); }
+        //     }
+        // }
+        for (auto i = mfi.begin(); i != mfi.end(); ++i) {
+            auto tmp = i;
+            for (auto j = ++tmp; j != mfi.end(); ++j) {  // i, j枚举module
+                for (auto i1 : i->second)                // i1枚举所有函数
+                    for (auto j1 : j->second) {          // i2枚举所有函数
+                        std::vector<llvm::Function::op_iterator> u, v;
+                        for (auto i2 = i1.bb.begin(); i2 != i1.bb.end(); ++i2)
+                            for (auto i3 = (*i2)->begin(); i3 != (*i2)->end(); ++i3)
+                                for (auto i4 = i3->op_begin(); i4 != i3->op_end(); ++i4) { u.push_back(i4); }
+                        for (auto j2 = j1.bb.begin(); j2 != j1.bb.end(); ++j2)
+                            for (auto j3 = (*j2)->begin(); j3 != (*j2)->end(); ++j3)
+                                for (auto j4 = j3->op_begin(); j4 != j3->op_end(); ++j4) { v.push_back(j4); }
+                        double res = (double)LCS(u, v) / std::min(u.size(), v.size());
+                        std::cerr << GREEN << i1.name << RESET << " (" << i1.mi->getInstructionCount()
+                                  << " instructions) in " << BLUE << i->first << ":" << i1.line << RESET << "\n"
+                                  << GREEN << j1.name << RESET << " (" << j1.mi->getInstructionCount()
+                                  << " instructions) in " << BLUE << j->first << ":" << j1.line << RESET << "\n\tare "
+                                  << RED << res * 100 << "% similar!" << RESET << "\n";
+                    }
+            }
+        }
         return false;
     }
-    // The address of this member is used to uniquely identify the class. This
-    // is used by LLVM's own RTTI mechanism.
 };
 
 }  // namespace
@@ -301,17 +327,14 @@ char FunComparator::ID = 2;
 char CfgComparator::ID = 3;
 
 // Register for opt
-static RegisterPass<Hello>      hello("hello", "Hello World Pass");
-static RegisterPass<Obfuscator> obfuscate("obfuscate", "Prefix Obfuscate Pass");
-static RegisterPass<FunComparator> cmpfun("cmpfun",
-                                          "Compare Merged IR Functions Pass");
-static RegisterPass<CfgComparator> cmpcfg("cmpcfg",
-                                          "Compare Merged IR CFG Pass");
+static RegisterPass<Hello>         hello("hello", "Hello World Pass");
+static RegisterPass<Obfuscator>    obfuscate("obfuscate", "Prefix Obfuscate Pass");
+static RegisterPass<FunComparator> cmpfun("cmpfun", "Compare Merged IR Functions Pass");
+static RegisterPass<CfgComparator> cmpcfg("cmpcfg", "Compare Merged IR CFG Pass");
 
 // Register for clang
 static RegisterStandardPasses Y(PassManagerBuilder::EP_EarlyAsPossible,
-                                [](const PassManagerBuilder& Builder,
-                                   legacy::PassManagerBase&  PM) {
+                                [](const PassManagerBuilder& Builder, legacy::PassManagerBase& PM) {
                                     PM.add(new Hello());
                                     PM.add(new Obfuscator());
                                     PM.add(new FunComparator());
