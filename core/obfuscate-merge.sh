@@ -27,7 +27,7 @@ then
     for file in $@
     do
         echo "processing '${file}'..."
-        clang++ $file $optm -g -S -emit-llvm -o ${file%.*}.ll
+        clang++ $file $optm -S -emit-llvm -o ${file%.*}.ll
         opt -load core/shavds.so -obfuscate < ${file%.*}.ll > ${file%.*}.bc
         llvm-dis ${file%.*}.bc -o ${file%.*}-obfuscate.ll
         rm ${file%.*}.bc

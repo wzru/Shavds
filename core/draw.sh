@@ -23,6 +23,7 @@ then
     done
     #通过shift $(($OPTIND - 1))的处理，$*中就只保留了除去选项内容的参数，可以在后面的shell程序中进行处理
     shift $(($OPTIND - 1))
+    echo -e "draw type is ${PINK}${tp}${RES}..."
     for file in $@
     do
         echo "processing ${file} ..."
@@ -31,7 +32,15 @@ then
         for dot in `ls -a | grep .dot`
         do
             base=$(basename $file)
-            pic=${dir}/${dot%.*}-${base%.*}-${tp}.png
+            if [ $tp == "cfg" ]
+            then
+                # echo dot=${dot%.*}
+                dot_base=$(echo ${dot%.*} | sed 's/\.//g')-
+                # echo dot_base=$dot_base
+            else
+                dot_base=""
+            fi
+            pic=${dir}/${dot_base}${base%.*}-${tp}.png
             dot -Tpng -o $pic ${dot%.*}.dot
             rm ${dot%.*}.dot
             if [ $? -eq 0 ]
