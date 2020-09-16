@@ -77,7 +77,8 @@ inline bool cmpOp(const llvm::Function::op_iterator& a, const llvm::Function::op
 
 inline u32 LCS(const VOPI& u, const VOPI& v)
 {
-    int   n = u.size(), m = v.size();
+    u32 n = u.size(), m = v.size();
+    // std::cerr << "LCS n=" << n << " m=" << m;
     u32** f = new u32*[n + 1];
     for (int i = 0; i <= n; ++i) { f[i] = new u32[m + 1](); }
     for (auto i = 0; i < n; ++i) {
@@ -91,7 +92,7 @@ inline u32 LCS(const VOPI& u, const VOPI& v)
     u32 ans = f[n][m];
     for (int i = 0; i <= n; ++i) { delete[] f[i]; }
     delete[] f;
-    // std::cerr << "n=" << n << " m=" << m << " ans=" << ans << "\n";
+    // std::cerr << " ans=" << ans << "\n";
     return ans;
 }
 
@@ -102,7 +103,9 @@ inline bool startWith(const std::string& s1, const std::string& s2)
 
 inline bool isIgnored(const std::string& name)
 {
-    return startWith(name, "_GLOBAL") || name == "main";
+    return startWith(name, "_GLOBAL")
+           // || name == "main"
+           || (name.find("::") != std::string::npos);
 }
 
 namespace {
@@ -248,6 +251,7 @@ struct CfgComparator : public ModulePass
     // may fail if, for example, the graph is not a DAG (detected a cycle).
     bool DoToposort(BasicBlock* BB, RIT it)
     {
+        // std::cerr << "Here's " << BB << "\n";
         ColorMap[BB] = GREY;
         // For demonstration, using the lowest-level APIs here. A BB's
         // successors are determined by looking at its terminator instruction.
@@ -258,14 +262,15 @@ struct CfgComparator : public ModulePass
             BasicBlock* Succ      = TInst->getSuccessor(I);
             Color       SuccColor = ColorMap[Succ];
             if (SuccColor == WHITE) {
-                if (!DoToposort(Succ, it)) return false;
+                // if (!DoToposort(Succ, it)) return false;
+                DoToposort(Succ, it);
             }
             else if (SuccColor == GREY) {
                 // This detects a cycle because grey vertices are all ancestors
                 // of the currently explored vertex (in other words, they're "on
                 // the stack").
-                errs() << "  Detected cycle: edge from " << BB->getName() << " to " << Succ->getName() << "\n";
-                return false;
+                // errs() << "  Detected cycle: edge from " << BB->getName() << " to " << Succ->getName() << "\n";
+                // return false;
             }
         }
         // This BB is finished (fully explored), so we can add it to the vector.
@@ -277,6 +282,7 @@ struct CfgComparator : public ModulePass
 
     bool runOnModule(Module& M)
     {
+        // fprintf(stderr, "Module=%s", M.getName());
         for (auto i = M.functions().begin(); i != M.functions().end(); ++i) {  //遍历模块中的函数
             std::string fullName = i->getName();
             size_t      pos      = fullName.find(SHAVDS);
@@ -290,16 +296,15 @@ struct CfgComparator : public ModulePass
             }
         }
         // for (auto i : mfi) {
-        //     for (auto j : i.second) {
-        //         for (auto k : j.bb) { fprintf(stderr, "%s %s num=%zu\n", i.first.c_str(), j.name.c_str(), k->size()); }
-        //     }
+        //     for (auto j : i.second) { fprintf(stderr, "%s %s\n", i.first.c_str(), j.name.c_str()); }
         // }
         for (auto i = mfi.begin(); i != mfi.end(); ++i) {
             auto tmp = i;
             for (auto j = ++tmp; j != mfi.end(); ++j) {  // i, j枚举module
                 for (auto i1 : i->second)                // i1枚举所有函数
                     for (auto j1 : j->second) {          // i2枚举所有函数
-                        std::vector<llvm::Function::op_iterator> u, v;
+                        // fprintf(stderr, "n:%s m:%s\n", i1.name.c_str(), j1.name.c_str());
+                        VOPI u, v;
                         for (auto i2 = i1.bb.begin(); i2 != i1.bb.end(); ++i2)
                             for (auto i3 = (*i2)->begin(); i3 != (*i2)->end(); ++i3)
                                 for (auto i4 = i3->op_begin(); i4 != i3->op_end(); ++i4) { u.push_back(i4); }
