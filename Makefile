@@ -4,4 +4,4 @@ all:
 	make -C server
 
 clean:
-	-find ./ -regex ".*\.dot\|.*\.ll\|.*\.bc\|.*\.png" -exec rm -v {} \;
+	-find ./samples -regex ".*\.dot\|.*\.ll\|.*\.bc\|.*\.png" -exec rm -v {} \;

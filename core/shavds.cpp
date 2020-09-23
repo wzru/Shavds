@@ -301,22 +301,42 @@ struct CfgComparator : public ModulePass
         for (auto i = mfi.begin(); i != mfi.end(); ++i) {
             auto tmp = i;
             for (auto j = ++tmp; j != mfi.end(); ++j) {  // i, j枚举module
-                for (auto i1 : i->second)                // i1枚举所有函数
-                    for (auto j1 : j->second) {          // i2枚举所有函数
+                u32 sum1 = 0, sum2 = 0, cnt1 = 0, cnt2 = 0;
+                u32 siz1 = i->second.size(), siz2 = j->second.size();
+                // 统计op数
+                for (auto i1 : i->second)
+                    for (auto i2 = i1.bb.begin(); i2 != i1.bb.end(); ++i2)
+                        for (auto i3 = (*i2)->begin(); i3 != (*i2)->end(); ++i3) sum1 += i3->getNumOperands();
+                for (auto j1 : j->second)
+                    for (auto j2 = j1.bb.begin(); j2 != j1.bb.end(); ++j2)
+                        for (auto j3 = (*j2)->begin(); j3 != (*j2)->end(); ++j3) sum2 += j3->getNumOperands();
+                for (auto i1 : i->second)        // i1枚举所有函数
+                    for (auto j1 : j->second) {  // i2枚举所有函数
                         // fprintf(stderr, "n:%s m:%s\n", i1.name.c_str(), j1.name.c_str());
+                        fprintf(stderr, "n:%s m:%s\n", i->first.c_str(), j->first.c_str());
                         VOPI u, v;
+                        // 做LCS
                         for (auto i2 = i1.bb.begin(); i2 != i1.bb.end(); ++i2)
-                            for (auto i3 = (*i2)->begin(); i3 != (*i2)->end(); ++i3)
+                            for (auto i3 = (*i2)->begin(); i3 != (*i2)->end(); ++i3) {
+                                cnt1 += i3->getNumOperands();
                                 for (auto i4 = i3->op_begin(); i4 != i3->op_end(); ++i4) { u.push_back(i4); }
+                            }
                         for (auto j2 = j1.bb.begin(); j2 != j1.bb.end(); ++j2)
-                            for (auto j3 = (*j2)->begin(); j3 != (*j2)->end(); ++j3)
+                            for (auto j3 = (*j2)->begin(); j3 != (*j2)->end(); ++j3) {
+                                cnt2 += j3->getNumOperands();
                                 for (auto j4 = j3->op_begin(); j4 != j3->op_end(); ++j4) { v.push_back(j4); }
+                            }
                         double res = (double)LCS(u, v) / std::min(u.size(), v.size());
-                        std::cerr << GREEN << i1.name << RESET << " (" << i1.mi->getInstructionCount()
-                                  << " instructions) in " << BLUE << i->first << ":" << i1.line << RESET << "\n"
-                                  << GREEN << j1.name << RESET << " (" << j1.mi->getInstructionCount()
-                                  << " instructions) in " << BLUE << j->first << ":" << j1.line << RESET << "\n\tare "
-                                  << RED << res * 100 << "% similar!" << RESET << "\n";
+                        // std::cerr << GREEN << i1.name << RESET << " (" << i1.mi->getInstructionCount()
+                        //           << " instructions) in " << BLUE << i->first << ":" << i1.line << RESET << "\n"
+                        //           << GREEN << j1.name << RESET << " (" << j1.mi->getInstructionCount()
+                        //           << " instructions) in " << BLUE << j->first << ":" << j1.line << RESET << "\n\tare
+                        //           "
+                        //           << RED << res * 100 << "% similar!" << RESET << "\n";
+
+                        // std::cerr.width(5);
+                        fprintf(stderr, "%6.2lf\%\n", (double)(cnt1) / (sum1 * siz2) * 100);
+                        // std::cerr << (double)(cnt1) / (sum1 * siz2) * 100 << "%\n";
                     }
             }
         }
