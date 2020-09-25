@@ -108,6 +108,28 @@ inline bool isIgnored(const std::string& name)
            || (name.find("::") != std::string::npos);
 }
 
+struct CmpRes
+{
+    std::string func1, func2;
+    u32         cnti1, cnti2;
+    u32         line1, line2;
+    std::string file1, file2;
+    double      sim;
+    CmpRes() = default;
+    CmpRes(const std::string& func1,
+           const std::string& func2,
+           u32                c1,
+           u32                c2,
+           u32                l1,
+           u32                l2,
+           const std::string& file1,
+           const std::string& file2,
+           double             s)
+        : func1(func1), func2(func2), cnti1(c1), cnti2(c2), line1(l1), line2(l2), file1(file1), file2(file2), sim(s)
+    {
+    }
+};
+
 namespace {
 struct Hello : public FunctionPass
 {
@@ -162,10 +184,6 @@ struct FunComparator : public ModulePass
                 for (auto k = j->op_begin(); k != j->op_end(); ++k) v.push_back(k);
         return (double)LCS(u, v) / std::min(u.size(), v.size());
     }
-    // double RepRate(llvm::Module::iterator& a, llvm::Module::iterator& b)
-    // {
-    //     return (double)FuncLcs(a, b) / std::min(a->getInstructionCount(), b->getInstructionCount());
-    // }
     bool runOnModule(Module& M) override
     {
         for (auto i = M.functions().begin(); i != M.functions().end(); ++i) {  //遍历模块中的函数
@@ -182,11 +200,17 @@ struct FunComparator : public ModulePass
             }
         }
         // std::cerr << "ready to compare...\n";
-        // std::map<std::string, std::vector<FuncInfo>> mfi;
+        u32 sum1 = 0, sum2 = 0, cnt1 = 0, cnt2 = 0;
         for (auto i = mfi.begin(); i != mfi.end(); ++i) {
             auto tmp = i;
             for (auto j = ++tmp; j != mfi.end(); ++j) {
                 // std::cerr << "Now compare " << i->first << " and " << j->first << "\n";
+                // for (auto i1 : i->second)
+                //     for (auto i2 = i1.bb.begin(); i2 != i1.bb.end(); ++i2)
+                //         for (auto i3 = (*i2)->begin(); i3 != (*i2)->end(); ++i3) sum1 += i3->getNumOperands();
+                // for (auto j1 : j->second)
+                //     for (auto j2 = j1.bb.begin(); j2 != j1.bb.end(); ++j2)
+                //         for (auto j3 = (*j2)->begin(; j3 != (*j2)->end(); ++j3) sum2 += j3->getNumOperands();
                 for (auto i1 : i->second)
                     for (auto j1 : j->second) {
                         double res = RepRate(i1.mi, j1.mi);
@@ -228,23 +252,8 @@ struct CfgComparator : public ModulePass
     CfgComparator() : ModulePass(ID) {}
     void Toposort(Function& F, RIT it)
     {
-        // errs() << "Topological sort of " << F.getName() << ":\n";
-        // Initialize the color map by marking all the vertices white.
         for (auto I = F.begin(), IE = F.end(); I != IE; ++I) { ColorMap[&*I] = WHITE; }
-        // The BB graph has a single entry vertex from which the other BBs
-        // should be discoverable - the function entry block.
         bool success = DoToposort(&F.getEntryBlock(), it);
-        // if (success) {
-        //     // Now we have all the BBs inside SortedBBs in reverse topological
-        //     // order.
-        //     errs() << "toposort size=" << SortedBBs.size() << "\n";
-        //     for (BBVector::const_reverse_iterator RI = SortedBBs.rbegin(), RE = SortedBBs.rend(); RI != RE; ++RI) {
-        //         errs() << "name=" << (*RI)->getName() << "\n";
-        //     }
-        // }
-        // else {
-        //     errs() << "  Sorting failed\n";
-        // }
     }
     // Helper function to recursively run topological sort from a given BB.
     // Returns true if the sort succeeded and false otherwise; topological sort
@@ -301,8 +310,9 @@ struct CfgComparator : public ModulePass
         for (auto i = mfi.begin(); i != mfi.end(); ++i) {
             auto tmp = i;
             for (auto j = ++tmp; j != mfi.end(); ++j) {  // i, j枚举module
-                u32 sum1 = 0, sum2 = 0, cnt1 = 0, cnt2 = 0;
-                u32 siz1 = i->second.size(), siz2 = j->second.size();
+                u32                 sum1 = 0, sum2 = 0, cnt1 = 0, cnt2 = 0;
+                u32                 siz1 = i->second.size(), siz2 = j->second.size();
+                std::vector<CmpRes> vcr;
                 // 统计op数
                 for (auto i1 : i->second)
                     for (auto i2 = i1.bb.begin(); i2 != i1.bb.end(); ++i2)
@@ -333,12 +343,19 @@ struct CfgComparator : public ModulePass
                         //           << " instructions) in " << BLUE << j->first << ":" << j1.line << RESET << "\n\tare
                         //           "
                         //           << RED << res * 100 << "% similar!" << RESET << "\n";
-
                         // std::cerr.width(5);
-                        fprintf(stderr, "%6.2lf\%\r", (double)(cnt1) / (sum1 * siz2) * 100);
+                        // fprintf(stderr, "%6.2lf\%\r", (double)(cnt1) / (sum1 * siz2) * 100);
+                        fprintf(stderr, "progress %.8lf\r", (double)(cnt1) / (sum1 * siz2));
                         // std::cerr << (double)(cnt1) / (sum1 * siz2) * 100 << "%\n";
+                        vcr.push_back(CmpRes(i1.name, j1.name, i1.mi->getInstructionCount(),
+                                             j1.mi->getInstructionCount(), i1.line, j1.line, i->first, j->first, res));
                     }
                 fprintf(stderr, "\n");
+                for (int i = 0; i < vcr.size(); ++i) {
+                    fprintf(stderr, "'%s' '%s' %u %u %u %u '%s' '%s' %.8lf\n", vcr[i].func1.c_str(),
+                            vcr[i].func2.c_str(), vcr[i].cnti1, vcr[i].cnti2, vcr[i].line1, vcr[i].line2,
+                            vcr[i].file1.c_str(), vcr[i].file2.c_str(), vcr[i].sim);
+                }
             }
         }
         return false;
