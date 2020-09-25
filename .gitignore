@@ -6,9 +6,10 @@
 *.so
 *.lib
 
-*.png
-*.jpg
-*.jpeg
+samples/**/*.png
+samples/**/*.jpg
+samples/**/*.jpeg
 
 .vscode
 .idea
+node_modules

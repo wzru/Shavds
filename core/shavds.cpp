@@ -313,7 +313,7 @@ struct CfgComparator : public ModulePass
                 for (auto i1 : i->second)        // i1枚举所有函数
                     for (auto j1 : j->second) {  // i2枚举所有函数
                         // fprintf(stderr, "n:%s m:%s\n", i1.name.c_str(), j1.name.c_str());
-                        fprintf(stderr, "n:%s m:%s\n", i->first.c_str(), j->first.c_str());
+                        // fprintf(stderr, "n:%s m:%s\n", i->first.c_str(), j->first.c_str());
                         VOPI u, v;
                         // 做LCS
                         for (auto i2 = i1.bb.begin(); i2 != i1.bb.end(); ++i2)
@@ -335,9 +335,10 @@ struct CfgComparator : public ModulePass
                         //           << RED << res * 100 << "% similar!" << RESET << "\n";
 
                         // std::cerr.width(5);
-                        fprintf(stderr, "%6.2lf\%\n", (double)(cnt1) / (sum1 * siz2) * 100);
+                        fprintf(stderr, "%6.2lf\%\r", (double)(cnt1) / (sum1 * siz2) * 100);
                         // std::cerr << (double)(cnt1) / (sum1 * siz2) * 100 << "%\n";
                     }
+                fprintf(stderr, "\n");
             }
         }
         return false;
