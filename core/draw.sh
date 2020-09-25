@@ -49,7 +49,7 @@ then
             fi
             if [ $? -eq 0 ]
             then
-                echo -e "${GREEN}successfully${RES} generated picture '${BLUE}${pic}${RES}'!"
+                echo -e "successfully generated '${pic}'!"
             fi
         done
     done

@@ -33,7 +33,7 @@ then
         rm ${file%.*}.bc
         if [ $? -eq 0 ]
         then
-            echo -e "${GREEN}successfully${RES} generated '${BLUE}${file%.*}.ll${RES}'"
+            echo -e "successfully generated '${file%.*}.ll'"
         fi
         lls+=(${file%.*}-obfuscate.ll)
     done

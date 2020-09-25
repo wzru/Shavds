@@ -1,4 +1,4 @@
-all: server
+all: shavds-server
 
-server: main.go
-	go build -o server main.go
+shavds-server: main.go
+	go build -o shavds-server main.go
