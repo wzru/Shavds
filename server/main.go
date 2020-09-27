@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"crypto/md5"
-	"fmt"
 	"io"
 	"net/http"
 	"os/exec"
@@ -14,22 +13,23 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// 颜色预定义
 var RED, GREEN, YELLEW, BLUE, PINK, RES = "\x1b\\[1;41m", "\x1b\\[1;42m", "\x1b\\[43;37m", "\x1b\\[1;44m", "\x1b\\[1;45m", "\x1b\\[0m"
 var progress = make(map[[16]byte]float64)
 var llReg = regexp.MustCompile(GREEN + "successfully" + RES + " generated '" + BLUE + "(.*?)" + RES)
 var smReg = regexp.MustCompile("'(.*?)' '(.*?)' (.*?) (.*?) (.*?) (.*?) '(.*?)' '(.*?)' (.*)")
 
-type CmpRes struct {
+type cmpRes struct {
 	Func1, Func2, File1, File2 string
 	Cnt1, Cnt2, Line1, Line2   int
 	Sim                        float64
 }
 
-func Pong(c *gin.Context) {
-	c.String(http.StatusOK, "Pong!")
+func pong(c *gin.Context) {
+	c.String(http.StatusOK, "pong!")
 }
 
-func Draw(c *gin.Context) {
+func draw(c *gin.Context) {
 	file := c.Query("file")
 	tp := c.Query("type")
 	cmd1 := exec.Command("./core/obfuscate-merge.sh", "-O0", file)
@@ -61,22 +61,16 @@ func Draw(c *gin.Context) {
 	})
 }
 
-func CmpFun(c *gin.Context) {
+func cmpfun(c *gin.Context) {
 	file1 := c.Query("file1")
 	file2 := c.Query("file2")
+	h := hash(file1, file2)
+	data := []cmpRes{}
+	progress[h] = 0
 	cmd1 := exec.Command("./core/obfuscate-merge.sh", "-O3", file1, file2)
 	out1, _ := cmd1.Output()
-	fmt.Printf("out1=%v\n", string(out1))
-	fmt.Printf("out1=%v\n", out1)
-	reg := regexp.MustCompile(GREEN + "successfully" + RES + " generated '" + BLUE + "(.*?)" + RES)
-	res := reg.FindStringSubmatch(string(out1))
+	res := llReg.FindStringSubmatch(string(out1))
 	ll := res[1]
-	// for _, text := range res {
-	// 	fmt.Printf("text type=%T\n", text)
-	// 	ll = text[1]
-	// }
-	fmt.Printf("ll=%v\nreg=%v\n", ll, reg.String())
-	// fmt.Printf("reg=%v\n", reg.String())
 	cmd2 := exec.Command("./core/shavds.sh", "cmpfun", ll)
 	buf := make([]byte, 256)
 	stderr, _ := cmd2.StderrPipe()
@@ -87,17 +81,44 @@ func CmpFun(c *gin.Context) {
 		if err != nil || io.EOF == err {
 			break
 		}
-		fmt.Println(cnt)
-		fmt.Println(string(buf[0:cnt]))
+		for _, line := range strings.Split(strings.Replace(string(buf[0:cnt]), "\r", "", -1), "\n") {
+			if strings.HasPrefix(line, "progress ") {
+				prog, _ := strconv.ParseFloat(strings.Split(line, " ")[1], 64)
+				progress[h] = prog
+			} else if strings.HasPrefix(line, "'") {
+				res := smReg.FindStringSubmatch(line)
+				cnt1, _ := strconv.Atoi(res[3])
+				cnt2, _ := strconv.Atoi(res[4])
+				line1, _ := strconv.Atoi(res[5])
+				line2, _ := strconv.Atoi(res[6])
+				sim, _ := strconv.ParseFloat(res[9], 64)
+				cmpRes := cmpRes{
+					Func1: res[1],
+					Func2: res[2],
+					Cnt1:  cnt1,
+					Cnt2:  cnt2,
+					Line1: line1,
+					Line2: line2,
+					File1: res[7],
+					File2: res[8],
+					Sim:   sim,
+				}
+				data = append(data, cmpRes)
+			}
+		}
 	}
 	cmd2.Wait()
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    data,
+	})
 }
 
-func CmpCfg(c *gin.Context) {
+func cmpcfg(c *gin.Context) {
 	file1 := c.Query("file1")
 	file2 := c.Query("file2")
 	h := hash(file1, file2)
-	data := []CmpRes{}
+	data := []cmpRes{}
 	progress[h] = 0
 	cmd1 := exec.Command("./core/obfuscate-merge.sh", "-O3", file1, file2)
 	out1, _ := cmd1.Output()
@@ -133,7 +154,7 @@ func CmpCfg(c *gin.Context) {
 				line1, _ := strconv.Atoi(res[5])
 				line2, _ := strconv.Atoi(res[6])
 				sim, _ := strconv.ParseFloat(res[9], 64)
-				cmpRes := CmpRes{
+				cmpRes := cmpRes{
 					Func1: res[1],
 					Func2: res[2],
 					Cnt1:  cnt1,
@@ -165,7 +186,7 @@ func hash(s1 string, s2 string) [16]byte {
 	return md5.Sum([]byte(s1 + s2))
 }
 
-func GetProgress(c *gin.Context) {
+func getProgress(c *gin.Context) {
 	file1 := c.Query("file1")
 	file2 := c.Query("file2")
 	c.JSON(http.StatusOK, gin.H{
@@ -178,10 +199,10 @@ func main() {
 	// out1, _ := cmd1.Output()
 	// fmt.Println(string(out1))
 	r := gin.Default()
-	r.GET("/ping", Pong)
-	r.GET("/draw", Draw)
-	r.GET("/cmpfun", CmpFun)
-	r.GET("/cmpcfg", CmpCfg)
-	r.GET("/progress", GetProgress)
+	r.GET("/ping", pong)
+	r.GET("/draw", draw)
+	r.GET("/cmpfun", cmpfun)
+	r.GET("/cmpcfg", cmpcfg)
+	r.GET("/progress", getProgress)
 	r.Run("0.0.0.0:7000")
 }

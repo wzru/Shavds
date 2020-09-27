@@ -172,8 +172,17 @@ struct FunComparator : public ModulePass
     };
     static char                                  ID;
     std::map<std::string, std::vector<FuncInfo>> mfi;
+    std::map<std::string, u32>                   mfic;  //每个文件的inst数量
     FunComparator() : ModulePass(ID) {}
-    double RepRate(llvm::Module::iterator& a, llvm::Module::iterator& b)
+    u32 Count(const llvm::Module::iterator& a)
+    {
+        u32 res = 0;
+        for (auto i = a->begin(); i != a->end(); ++i)
+            for (auto j = i->begin(); j != i->end(); ++j)
+                for (auto k = j->op_begin(); k != j->op_end(); ++k) ++res;
+        return res;
+    }
+    double RepRate(llvm::Module::iterator& a, llvm::Module::iterator& b, u32& cnt)
     {
         VOPI u, v;
         for (auto i = a->begin(); i != a->end(); ++i)
@@ -182,6 +191,7 @@ struct FunComparator : public ModulePass
         for (auto i = b->begin(); i != b->end(); ++i)
             for (auto j = i->begin(); j != i->end(); ++j)
                 for (auto k = j->op_begin(); k != j->op_end(); ++k) v.push_back(k);
+        cnt += u.size() * v.size();
         return (double)LCS(u, v) / std::min(u.size(), v.size());
     }
     bool runOnModule(Module& M) override
@@ -199,8 +209,17 @@ struct FunComparator : public ModulePass
                 // std::cerr << "name=" << mfi[fileName][0].name << "\n";
             }
         }
-        // std::cerr << "ready to compare...\n";
-        u32 sum1 = 0, sum2 = 0, cnt1 = 0, cnt2 = 0;
+        for (auto i : mfi) {
+            for (auto j : i.second) { mfic[i.first] += Count(j.mi); }
+        }
+        u32 sum = 0, sum2 = 0;
+        for (auto i : mfic) {
+            // printf("i.sec=%d\n", i.second);
+            sum += i.second;
+            sum2 += i.second * i.second;
+        }
+        u32                 s = (sum * sum - sum2) / 2, cnt = 0;
+        std::vector<CmpRes> vcr;
         for (auto i = mfi.begin(); i != mfi.end(); ++i) {
             auto tmp = i;
             for (auto j = ++tmp; j != mfi.end(); ++j) {
@@ -213,14 +232,24 @@ struct FunComparator : public ModulePass
                 //         for (auto j3 = (*j2)->begin(; j3 != (*j2)->end(); ++j3) sum2 += j3->getNumOperands();
                 for (auto i1 : i->second)
                     for (auto j1 : j->second) {
-                        double res = RepRate(i1.mi, j1.mi);
-                        std::cerr << GREEN << i1.name << RESET << " (" << i1.mi->getInstructionCount()
-                                  << " instructions) in " << BLUE << i->first << ":" << i1.line << RESET << "\n"
-                                  << GREEN << j1.name << RESET << " (" << j1.mi->getInstructionCount()
-                                  << " instructions) in " << BLUE << j->first << ":" << j1.line << RESET << "\n\tare "
-                                  << RED << res * 100 << "% similar!" << RESET << "\n";
+                        double res = RepRate(i1.mi, j1.mi, cnt);
+                        fprintf(stderr, "progress %.8lf\r", (double)cnt / s);
+                        vcr.push_back(CmpRes(i1.name, j1.name, i1.mi->getInstructionCount(),
+                                             j1.mi->getInstructionCount(), i1.line, j1.line, i->first, j->first, res));
+                        // std::cerr << GREEN << i1.name << RESET << " (" << i1.mi->getInstructionCount()
+                        //           << " instructions) in " << BLUE << i->first << ":" << i1.line << RESET << "\n"
+                        //           << GREEN << j1.name << RESET << " (" << j1.mi->getInstructionCount()
+                        //           << " instructions) in " << BLUE << j->first << ":" << j1.line << RESET << "\n\tare
+                        //           "
+                        //           << RED << res * 100 << "% similar!" << RESET << "\n";
                     }
             }
+        }
+        fprintf(stderr, "\n");
+        for (int i = 0; i < vcr.size(); ++i) {
+            fprintf(stderr, "'%s' '%s' %u %u %u %u '%s' '%s' %.8lf\n", vcr[i].func1.c_str(), vcr[i].func2.c_str(),
+                    vcr[i].cnti1, vcr[i].cnti2, vcr[i].line1, vcr[i].line2, vcr[i].file1.c_str(), vcr[i].file2.c_str(),
+                    vcr[i].sim);
         }
         return false;
     }
