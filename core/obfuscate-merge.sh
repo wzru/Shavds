@@ -9,11 +9,15 @@ RES='\e[0m'  # 清除颜色
 if [ $# -ge 2 ]
 then
     optm=-O3
-    while getopts "O:" opt
+    dbg=
+    while getopts "O:g" opt
     do
         case $opt in
             O)
                 optm=-O$OPTARG
+                ;;
+            g)
+                dbg=-g
                 ;;
             ?)
                 echo -e "there is some ${RED}unrecognized${RES} parameters"
@@ -27,7 +31,7 @@ then
     for file in $@
     do
         echo "processing '${file}'..."
-        clang++ $file $optm -g -S -emit-llvm -o ${file%.*}.ll
+        clang++ $file $optm $dbg -S -emit-llvm -o ${file%.*}.ll
         opt -load core/shavds.so -obfuscate < ${file%.*}.ll > ${file%.*}.bc
         llvm-dis ${file%.*}.bc -o ${file%.*}-obfuscate.ll
         rm ${file%.*}.bc
