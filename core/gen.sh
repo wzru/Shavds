@@ -46,16 +46,14 @@ then
         fi
         lls+=(${file%.*}-obfuscate.ll)
     done
-    if [ ${#lls[*]} -le 1 ]
+    if [ ${#lls[*]} -ge 2 ]
     then
-        echo -e "no need to merge."
-        exit 1
-    fi
-    merge="$(dirname $file)/merge.ll"
-    llvm-link ${lls[*]} -S -o $merge
-    if [ $? -eq 0 ]
-    then
-        echo -e "${GREEN}successfully${RES} generated '${BLUE}${merge}${RES}'"
+        merge="$(dirname $file)/merge.ll"
+        llvm-link ${lls[*]} -S -o $merge
+        if [ $? -eq 0 ]
+        then
+            echo -e "${GREEN}successfully${RES} generated '${BLUE}${merge}${RES}'"
+        fi
     fi
     # 删除obfuscate文件
     for file in $@

@@ -209,11 +209,11 @@ struct FunComparator : public ModulePass
                 // std::cerr << "name=" << mfi[fileName][0].name << "\n";
             }
         }
-        for (auto i : mfi) {
+        for (auto& i : mfi) {
             for (auto j : i.second) { mfic[i.first] += Count(j.mi); }
         }
         u32 sum = 0, sum2 = 0;
-        for (auto i : mfic) {
+        for (auto& i : mfic) {
             // printf("i.sec=%d\n", i.second);
             sum += i.second;
             sum2 += i.second * i.second;
@@ -230,8 +230,8 @@ struct FunComparator : public ModulePass
                 // for (auto j1 : j->second)
                 //     for (auto j2 = j1.bb.begin(); j2 != j1.bb.end(); ++j2)
                 //         for (auto j3 = (*j2)->begin(; j3 != (*j2)->end(); ++j3) sum2 += j3->getNumOperands();
-                for (auto i1 : i->second)
-                    for (auto j1 : j->second) {
+                for (auto& i1 : i->second)
+                    for (auto& j1 : j->second) {
                         double res = RepRate(i1.mi, j1.mi, cnt);
                         fprintf(stderr, "progress %.8lf\r", (double)cnt / s);
                         vcr.push_back(CmpRes(i1.name, j1.name, i1.mi->getInstructionCount(),
