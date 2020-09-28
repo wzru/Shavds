@@ -32,6 +32,11 @@ then
     do
         echo "processing '${file}'..."
         clang++ $file $optm $dbg -S -emit-llvm -o ${file%.*}.ll
+        if [ $? -ne 0 ]
+        then
+            echo -e "${RED}failed${RES} to process '${file}'"
+            exit 1
+        fi
         opt -load core/shavds.so -obfuscate < ${file%.*}.ll > ${file%.*}.bc
         llvm-dis ${file%.*}.bc -o ${file%.*}-obfuscate.ll
         rm ${file%.*}.bc
@@ -41,8 +46,11 @@ then
         fi
         lls+=(${file%.*}-obfuscate.ll)
     done
-    # echo ${lls[*]}
-    # echo "file" ${file%.*}
+    if [ ${#lls[*]} -le 1 ]
+    then
+        echo -e "no need to merge."
+        exit 1
+    fi
     merge="$(dirname $file)/merge.ll"
     llvm-link ${lls[*]} -S -o $merge
     if [ $? -eq 0 ]
@@ -56,5 +64,5 @@ then
     done
 
 else
-    echo -e "${PINK}usage: obfuscate-merge.sh -O[0 | 1 | 2 | 3] [*.c | *.cpp]...${RES}"
+    echo -e "${PINK}usage: gen.sh -O[0 | 1 | 2 | 3] [-g] [*.c | *.cpp]...${RES}"
 fi

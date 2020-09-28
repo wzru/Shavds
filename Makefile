@@ -5,3 +5,5 @@ all:
 
 clean:
 	-find ./samples -regex ".*\.dot\|.*\.ll\|.*\.bc\|.*\.png" -exec rm -v {} \;
+	rm ./server/shavds-server 
+	rm ./core/shavds.so
