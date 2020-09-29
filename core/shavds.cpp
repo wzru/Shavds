@@ -393,10 +393,39 @@ struct CfgComparator : public ModulePass
 
 struct Detector : public ModulePass
 {
-    static char ID;
+    static char                    ID;
+    const std::vector<std::string> VulFuncNames{
+        "strcpy",  "strcpy", "strncpy", "memcpy", "memncpy", "strcat", "strncat", "sprintf", "vsprintf", "gets",
+        "getchar", "fgetc",  "getc",    "read",   "sscanf",  "fscanf", "vfscanf", "vscanf",  "vsscanf"};
     Detector() : ModulePass(ID) {}
+    bool isVur(const std::string& name)
+    {
+        for (auto i : VulFuncNames) {
+            if (i == name) return true;
+        }
+        return false;
+    }
     bool runOnModule(Module& M)
     {
+        for (Module::iterator F = M.begin(); F != M.end(); ++F) {
+            for (Function::iterator B = F->begin(); B != F->end(); ++B)  //获取每个函数中的basic block
+            {
+                // std::cerr << "Basic block name=" << B->getName().str() << std::endl;
+                for (BasicBlock::iterator i = B->begin(); i != B->end(); ++i)  //获取每个basic block中的instruction
+                {
+                    for (auto op = i->op_begin(); op != i->op_end(); ++op) {
+                        if (isVur(op->get()->getName())) {
+                            // errs() << "overflow " << F->getSubprogram()->getLine() << "\n";
+                            errs() << "overflow " << i->getDebugLoc().getLine() << "\n";
+                        }
+                        // errs() << "no=" << op->getOperandNo() << "\n";
+                        // errs() << "name=" << op->get()->getName() << "\n";
+                    }
+                    // errs() << *i << "\n";
+                    // Instruction* inst = &(*i);
+                }
+            }
+        }
         return false;
     }
 };
