@@ -391,18 +391,30 @@ struct CfgComparator : public ModulePass
     }
 };
 
+struct Detector : public ModulePass
+{
+    static char ID;
+    Detector() : ModulePass(ID) {}
+    bool runOnModule(Module& M)
+    {
+        return false;
+    }
+};
+
 }  // namespace
 
 char Hello::ID         = 0;
 char Obfuscator::ID    = 1;
 char FunComparator::ID = 2;
 char CfgComparator::ID = 3;
+char Detector::ID      = 4;
 
 // Register for opt
 static RegisterPass<Hello>         hello("hello", "Hello World Pass");
 static RegisterPass<Obfuscator>    obfuscate("obfuscate", "Prefix Obfuscate Pass");
 static RegisterPass<FunComparator> cmpfun("cmpfun", "Compare Merged IR Functions Pass");
 static RegisterPass<CfgComparator> cmpcfg("cmpcfg", "Compare Merged IR CFG Pass");
+static RegisterPass<Detector>      detect("detect", "Detect Vulnerability Pass");
 
 // Register for clang
 static RegisterStandardPasses Y(PassManagerBuilder::EP_EarlyAsPossible,
@@ -411,4 +423,5 @@ static RegisterStandardPasses Y(PassManagerBuilder::EP_EarlyAsPossible,
                                     PM.add(new Obfuscator());
                                     PM.add(new FunComparator());
                                     PM.add(new CfgComparator());
+                                    PM.add(new Detector());
                                 });
