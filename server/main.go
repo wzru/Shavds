@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -23,11 +25,18 @@ var progress = make(map[[16]byte]float64)
 var llReg = regexp.MustCompile(GREEN + "successfully" + RES + " generated '" + BLUE + "(.*?)" + RES)
 var smReg = regexp.MustCompile("'(.*?)' '(.*?)' (.*?) (.*?) (.*?) (.*?) '(.*?)' '(.*?)' (.*)")
 var dataDir = "./data/"
+var codeExts = []string{".cpp", ".c", ".go", ".cc", ".cxx"}
 
 type cmpRes struct {
-	Func1, Func2, File1, File2 string
-	Cnt1, Cnt2, Line1, Line2   int
-	Sim                        float64
+	Func1 string  `json:"func1"`
+	Func2 string  `json:"func2"`
+	File1 string  `json:"file1"`
+	File2 string  `json:"file2"`
+	Cnt1  int     `json:"inst1"`
+	Cnt2  int     `json:"inst2"`
+	Line1 int     `json:"line1"`
+	Line2 int     `json:"line2"`
+	Sim   float64 `json:"similarity"`
 }
 
 func printHTTP(c *gin.Context) {
@@ -46,14 +55,20 @@ func pong(c *gin.Context) {
 }
 
 func draw(c *gin.Context) {
-	printHTTP(c)
 	cookie, _ := c.Cookie("shavds")
-	fmt.Printf("cookie=%v\n", cookie)
+	if cookie == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"data":    nil,
+			"msg":     "缺少cookie",
+		})
+		return
+	}
 	dir := dataDir + cookie + "/"
 	file := c.Query("file")
 	tp := c.Query("type")
 	cmd1 := exec.Command("./core/gen.sh", "-O0", "-g", dir+file)
-	fmt.Println(cmd1.String())
+	// fmt.Println(cmd1.String())
 	out1, _ := cmd1.Output()
 	reg := regexp.MustCompile(`successfully generated \'(?s:(.*?))\'`)
 	res := (reg.FindAllStringSubmatch(string(out1), -1))
@@ -61,24 +76,38 @@ func draw(c *gin.Context) {
 	for _, text := range res {
 		ll = text[1]
 	}
-	cmd2 := exec.Command("./core/draw.sh", "-T "+tp, ll)
-	fmt.Println(cmd2.String())
+	cmd2 := exec.Command("./core/draw.sh", "-T", tp, ll)
+	// fmt.Println(cmd2.String())
 	out2, _ := cmd2.Output()
 	res = reg.FindAllStringSubmatch(string(out2), -1)
-	img := ""
+	imgs := []string{}
+	// fmt.Printf("res=%v\n", res)
 	for _, text := range res {
-		img = text[1]
+		// fmt.Printf("text=%v\n", text)
+		imgs = append(imgs, filepath.Base(text[1]))
 	}
-	c.File(img)
-	// c.JSON(http.StatusOK, gin.H{
-	// 	"success": true,
-	// 	"data":    img,
-	// })
+	fmt.Printf("imgs=%v\n", imgs)
+	// c.File(img)
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"images": imgs,
+		}})
 }
 
 func cmpfun(c *gin.Context) {
-	file1 := c.Query("file1")
-	file2 := c.Query("file2")
+	cookie, _ := c.Cookie("shavds")
+	if cookie == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"data":    nil,
+			"msg":     "缺少cookie",
+		})
+		return
+	}
+	dir := dataDir + cookie + "/"
+	file1 := dir + c.Query("file1")
+	file2 := dir + c.Query("file2")
 	h := hash(file1, file2)
 	data := []cmpRes{}
 	progress[h] = 0
@@ -86,6 +115,7 @@ func cmpfun(c *gin.Context) {
 	out1, _ := cmd1.Output()
 	res := llReg.FindStringSubmatch(string(out1))
 	ll := res[1]
+	// fmt.Printf("ll=%v\n", ll)
 	cmd2 := exec.Command("./core/shavds.sh", "cmpfun", ll)
 	buf := make([]byte, 256)
 	stderr, _ := cmd2.StderrPipe()
@@ -96,12 +126,16 @@ func cmpfun(c *gin.Context) {
 		if err != nil || io.EOF == err {
 			break
 		}
-		for _, line := range strings.Split(strings.Replace(string(buf[0:cnt]), "\r", "", -1), "\n") {
+		for _, line := range strings.Split(strings.Replace(string(buf[0:cnt]), "\r", "\n", -1), "\n") {
 			if strings.HasPrefix(line, "progress ") {
 				prog, _ := strconv.ParseFloat(strings.Split(line, " ")[1], 64)
 				progress[h] = prog
 			} else if strings.HasPrefix(line, "'") {
 				res := smReg.FindStringSubmatch(line)
+				// fmt.Printf("res=%v\n", res)
+				if len(res) == 0 {
+					continue
+				}
 				cnt1, _ := strconv.Atoi(res[3])
 				cnt2, _ := strconv.Atoi(res[4])
 				line1, _ := strconv.Atoi(res[5])
@@ -130,9 +164,20 @@ func cmpfun(c *gin.Context) {
 }
 
 func cmpcfg(c *gin.Context) {
-	file1 := c.Query("file1")
-	file2 := c.Query("file2")
+	cookie, _ := c.Cookie("shavds")
+	if cookie == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"data":    nil,
+			"msg":     "缺少cookie",
+		})
+		return
+	}
+	dir := dataDir + cookie + "/"
+	file1 := dir + c.Query("file1")
+	file2 := dir + c.Query("file2")
 	h := hash(file1, file2)
+	// fmt.Printf("hash=%v\n", h)
 	data := []cmpRes{}
 	progress[h] = 0
 	cmd1 := exec.Command("./core/gen.sh", "-O3", "-g", file1, file2)
@@ -156,14 +201,17 @@ func cmpcfg(c *gin.Context) {
 		}
 		// fmt.Println(cnt)
 		// fmt.Println(string(buf[0:cnt]))
-		for _, line := range strings.Split(strings.Replace(string(buf[0:cnt]), "\r", "", -1), "\n") {
+		for _, line := range strings.Split(strings.Replace(string(buf[0:cnt]), "\r", "\n", -1), "\n") {
 			// fmt.Printf("line:%v\n", line)
 			if strings.HasPrefix(line, "progress ") {
 				prog, _ := strconv.ParseFloat(strings.Split(line, " ")[1], 64)
-				// fmt.Printf("orig=%v\nprogress=%v\n", strings.Split(line, " ")[1], prog)
+				// fmt.Printf("[]byte(line)=%v\nline=%v\nprogress=%v\n", []byte(line), line, prog)
 				progress[h] = prog
 			} else if strings.HasPrefix(line, "'") {
 				res := smReg.FindStringSubmatch(line)
+				if len(res) == 0 {
+					continue
+				}
 				cnt1, _ := strconv.Atoi(res[3])
 				cnt2, _ := strconv.Atoi(res[4])
 				line1, _ := strconv.Atoi(res[5])
@@ -202,8 +250,19 @@ func hash(s1 string, s2 string) [16]byte {
 }
 
 func getProgress(c *gin.Context) {
-	file1 := c.Query("file1")
-	file2 := c.Query("file2")
+	cookie, _ := c.Cookie("shavds")
+	if cookie == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"data":    nil,
+			"msg":     "缺少cookie",
+		})
+		return
+	}
+	dir := dataDir + cookie + "/"
+	file1 := dir + c.Query("file1")
+	file2 := dir + c.Query("file2")
+	// fmt.Printf("hash=%v\n", hash(file1, file2))
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data":    progress[hash(file1, file2)]})
@@ -223,7 +282,7 @@ func upload(c *gin.Context) {
 	cookie, err := c.Cookie("shavds")
 	if err != nil {
 		cookie = genCookie(c)
-		c.SetCookie("shavds", cookie, 3600*24*7, "/", "localhost", false, true)
+		c.SetCookie("shavds", cookie, 3600*24*30, "/", "localhost", false, true)
 	}
 	os.Mkdir(dataDir+cookie, os.ModePerm)
 	form, err := c.MultipartForm()
@@ -258,12 +317,100 @@ func upload(c *gin.Context) {
 	})
 }
 
+func getFile(c *gin.Context) {
+	cookie, _ := c.Cookie("shavds")
+	if cookie == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"data":    nil,
+			"msg":     "缺少cookie",
+		})
+		return
+	}
+	file := dataDir + cookie + "/" + c.Param("file")
+	c.File(file)
+}
+
+func delFile(c *gin.Context) {
+	cookie, _ := c.Cookie("shavds")
+	if cookie == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"data":    nil,
+			"msg":     "缺少cookie",
+		})
+		return
+	}
+	file := dataDir + cookie + "/" + c.Param("file")
+	os.Remove(file)
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    nil,
+	})
+}
+
+func delFiles(c *gin.Context) {
+	cookie, _ := c.Cookie("shavds")
+	if cookie == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"data":    nil,
+			"msg":     "缺少cookie",
+		})
+		return
+	}
+	os.RemoveAll(dataDir + cookie + "/")
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    nil,
+	})
+}
+
+func isCodeExt(file string) bool {
+	ext := path.Ext(file)
+	for _, e := range codeExts {
+		if e == ext {
+			return true
+		}
+	}
+	return false
+}
+
+func getList(c *gin.Context) {
+	cookie, _ := c.Cookie("shavds")
+	if cookie == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"data":    nil,
+			"msg":     "缺少cookie",
+		})
+		return
+	}
+	dir := dataDir + cookie + "/"
+	rd, _ := ioutil.ReadDir(dir)
+	var files []string
+	for _, file := range rd {
+		if !file.IsDir() && isCodeExt(file.Name()) {
+			files = append(files, file.Name())
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data": gin.H{
+			"list": files,
+		}})
+}
+
 func main() {
 	os.Mkdir(dataDir, os.ModePerm)
 	r := gin.Default()
 	r.GET("/ping", pong)
 	r.POST("/upload", upload)
-	r.GET("/draw", draw)
+	r.POST("/draw", draw)
+	r.GET("/list", getList)
+	r.GET("/file/:file", getFile)
+	r.DELETE("/file/:file", delFile)
+	r.DELETE("/files", delFiles)
 	r.GET("/cmpfun", cmpfun)
 	r.GET("/cmpcfg", cmpcfg)
 	r.GET("/progress", getProgress)
