@@ -38,3 +38,12 @@ cd Shavds/
 ./core/draw.sh cfg ./samples/func/func1.ll
 ```
 
+4. detect
+
+检验代码中的漏洞
+
+```shell
+cd Shavds/
+./core/gen.sh -O0 -g ./samples/overflow/*.cpp
+./core/shavds.sh detect ./samples/overflow/*.ll
+```

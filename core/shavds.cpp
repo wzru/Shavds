@@ -416,7 +416,8 @@ struct Detector : public ModulePass
                     for (auto op = i->op_begin(); op != i->op_end(); ++op) {
                         if (isVur(op->get()->getName())) {
                             // errs() << "overflow " << F->getSubprogram()->getLine() << "\n";
-                            errs() << "overflow " << i->getDebugLoc().getLine() << "\n";
+                            errs() << "overflow " << i->getDebugLoc().getLine() << " " << i->getDebugLoc().getCol()
+                                   << "\n";
                         }
                         // errs() << "no=" << op->getOperandNo() << "\n";
                         // errs() << "name=" << op->get()->getName() << "\n";

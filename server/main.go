@@ -22,8 +22,9 @@ import (
 // 颜色预定义
 var RED, GREEN, YELLEW, BLUE, PINK, RES = "\x1b\\[1;41m", "\x1b\\[1;42m", "\x1b\\[43;37m", "\x1b\\[1;44m", "\x1b\\[1;45m", "\x1b\\[0m"
 var progress = make(map[[16]byte]float64)
-var llReg = regexp.MustCompile(GREEN + "successfully" + RES + " generated '" + BLUE + "(.*?)" + RES)
-var smReg = regexp.MustCompile("'(.*?)' '(.*?)' (.*?) (.*?) (.*?) (.*?) '(.*?)' '(.*?)' (.*)")
+var cllReg = regexp.MustCompile(GREEN + "successfully" + RES + " generated '" + BLUE + "(.*)" + RES)
+var llReg = regexp.MustCompile("successfully generated '(.*)'")
+var cmpReg = regexp.MustCompile("'(.*?)' '(.*?)' (.*?) (.*?) (.*?) (.*?) '(.*?)' '(.*?)' (.*)")
 var dataDir = "./data/"
 var codeExts = []string{".cpp", ".c", ".go", ".cc", ".cxx"}
 
@@ -37,6 +38,12 @@ type cmpRes struct {
 	Line1 int     `json:"line1"`
 	Line2 int     `json:"line2"`
 	Sim   float64 `json:"similarity"`
+}
+
+type vulRes struct {
+	Type string `json:"type"`
+	Line int    `json:"line"`
+	Col  int    `json:"column"`
 }
 
 func printHTTP(c *gin.Context) {
@@ -113,11 +120,11 @@ func cmpfun(c *gin.Context) {
 	progress[h] = 0
 	cmd1 := exec.Command("./core/gen.sh", "-O3", "-g", file1, file2)
 	out1, _ := cmd1.Output()
-	res := llReg.FindStringSubmatch(string(out1))
+	res := cllReg.FindStringSubmatch(string(out1))
 	ll := res[1]
 	// fmt.Printf("ll=%v\n", ll)
 	cmd2 := exec.Command("./core/shavds.sh", "cmpfun", ll)
-	buf := make([]byte, 256)
+	buf := make([]byte, 1024)
 	stderr, _ := cmd2.StderrPipe()
 	cmd2.Start()
 	reader := bufio.NewReader(stderr)
@@ -131,7 +138,7 @@ func cmpfun(c *gin.Context) {
 				prog, _ := strconv.ParseFloat(strings.Split(line, " ")[1], 64)
 				progress[h] = prog
 			} else if strings.HasPrefix(line, "'") {
-				res := smReg.FindStringSubmatch(line)
+				res := cmpReg.FindStringSubmatch(line)
 				// fmt.Printf("res=%v\n", res)
 				if len(res) == 0 {
 					continue
@@ -184,13 +191,13 @@ func cmpcfg(c *gin.Context) {
 	out1, _ := cmd1.Output()
 	// fmt.Printf("out1=%v\n", string(out1))
 	// fmt.Printf("out1=%v\n", out1)
-	res := llReg.FindStringSubmatch(string(out1))
+	res := cllReg.FindStringSubmatch(string(out1))
 	// fmt.Printf("res[%d]=%v\n", len(res), res)
 	ll := res[1]
-	// fmt.Printf("ll=%v\nreg=%v\n", ll, llReg.String())
+	// fmt.Printf("ll=%v\nreg=%v\n", ll, cllReg.String())
 	// fmt.Printf("reg=%v\n", reg.String())
 	cmd2 := exec.Command("./core/shavds.sh", "cmpcfg", ll)
-	buf := make([]byte, 256)
+	buf := make([]byte, 1024)
 	stderr, _ := cmd2.StderrPipe()
 	cmd2.Start()
 	reader := bufio.NewReader(stderr)
@@ -208,7 +215,7 @@ func cmpcfg(c *gin.Context) {
 				// fmt.Printf("[]byte(line)=%v\nline=%v\nprogress=%v\n", []byte(line), line, prog)
 				progress[h] = prog
 			} else if strings.HasPrefix(line, "'") {
-				res := smReg.FindStringSubmatch(line)
+				res := cmpReg.FindStringSubmatch(line)
 				if len(res) == 0 {
 					continue
 				}
@@ -401,18 +408,70 @@ func getList(c *gin.Context) {
 		}})
 }
 
+func detect(c *gin.Context) {
+	cookie, _ := c.Cookie("shavds")
+	if cookie == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"success": false,
+			"data":    nil,
+			"msg":     "缺少cookie",
+		})
+		return
+	}
+	dir := dataDir + cookie + "/"
+	file := dir + c.Query("file")
+	cmd1 := exec.Command("./core/gen.sh", "-O0", "-g", file)
+	out1, _ := cmd1.Output()
+	// fmt.Printf("out1=%v\n", string(out1))
+	res := llReg.FindStringSubmatch(string(out1))
+	ll := res[1]
+	// fmt.Printf("res=%v\n", res)
+	cmd2 := exec.Command("./core/shavds.sh", "detect", ll)
+	buf := make([]byte, 1024)
+	data := []vulRes{}
+	stderr, _ := cmd2.StderrPipe()
+	cmd2.Start()
+	reader := bufio.NewReader(stderr)
+	for {
+		cnt, err := reader.Read(buf)
+		if err != nil || io.EOF == err {
+			break
+		}
+		for _, line := range strings.Split(string(buf[0:cnt]), "\n") {
+			if len(line) == 0 {
+				continue
+			}
+			res := strings.Split(line, " ")
+			line, _ := strconv.Atoi(res[1])
+			col, _ := strconv.Atoi(res[2])
+			vulRes := vulRes{
+				Type: res[0],
+				Line: line,
+				Col:  col,
+			}
+			data = append(data, vulRes)
+		}
+	}
+	cmd2.Wait()
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    data,
+	})
+}
+
 func main() {
 	os.Mkdir(dataDir, os.ModePerm)
 	r := gin.Default()
 	r.GET("/ping", pong)
 	r.POST("/upload", upload)
-	r.POST("/draw", draw)
 	r.GET("/list", getList)
 	r.GET("/file/:file", getFile)
 	r.DELETE("/file/:file", delFile)
 	r.DELETE("/files", delFiles)
+	r.POST("/draw", draw)
 	r.GET("/cmpfun", cmpfun)
 	r.GET("/cmpcfg", cmpcfg)
 	r.GET("/progress", getProgress)
+	r.GET("/detect", detect)
 	r.Run("0.0.0.0:7000")
 }
