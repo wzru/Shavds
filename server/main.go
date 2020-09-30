@@ -30,7 +30,7 @@ type cmpRes struct {
 	Sim                        float64
 }
 
-func pong(c *gin.Context) {
+func printHTTP(c *gin.Context) {
 	body, _ := ioutil.ReadAll(c.Request.Body)
 	fmt.Println("---body/--- \r\n " + string(body))
 	fmt.Println("---header/--- \r\n")
@@ -38,14 +38,22 @@ func pong(c *gin.Context) {
 		fmt.Println(k, v)
 	}
 	fmt.Printf("ip=%v\nua=%v\n", c.ClientIP, c.Request.Header["User-Agent"])
+}
+
+func pong(c *gin.Context) {
+	printHTTP(c)
 	c.String(http.StatusOK, "pong!")
 }
 
 func draw(c *gin.Context) {
-	// cookie, _ := c.Cookie("shavds")
+	printHTTP(c)
+	cookie, _ := c.Cookie("shavds")
+	fmt.Printf("cookie=%v\n", cookie)
+	dir := dataDir + cookie + "/"
 	file := c.Query("file")
 	tp := c.Query("type")
-	cmd1 := exec.Command("./core/gen.sh", "-O0", "-g", file)
+	cmd1 := exec.Command("./core/gen.sh", "-O0", "-g", dir+file)
+	fmt.Println(cmd1.String())
 	out1, _ := cmd1.Output()
 	reg := regexp.MustCompile(`successfully generated \'(?s:(.*?))\'`)
 	res := (reg.FindAllStringSubmatch(string(out1), -1))
@@ -53,17 +61,19 @@ func draw(c *gin.Context) {
 	for _, text := range res {
 		ll = text[1]
 	}
-	cmd2 := exec.Command("./core/draw.sh", tp, ll)
+	cmd2 := exec.Command("./core/draw.sh", "-T "+tp, ll)
+	fmt.Println(cmd2.String())
 	out2, _ := cmd2.Output()
 	res = reg.FindAllStringSubmatch(string(out2), -1)
 	img := ""
 	for _, text := range res {
 		img = text[1]
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    img,
-	})
+	c.File(img)
+	// c.JSON(http.StatusOK, gin.H{
+	// 	"success": true,
+	// 	"data":    img,
+	// })
 }
 
 func cmpfun(c *gin.Context) {
@@ -207,6 +217,8 @@ func genCookie(c *gin.Context) string {
 	return fmt.Sprintf("%x", md5.Sum([]byte(x)))
 }
 
+// curl example:
+// curl -F "files=@./func1.cpp" -F "files=@./func2.cpp"  http://localhost:7000/upload
 func upload(c *gin.Context) {
 	cookie, err := c.Cookie("shavds")
 	if err != nil {
