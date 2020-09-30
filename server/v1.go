@@ -3,16 +3,12 @@ package main
 import (
 	"bufio"
 	"crypto/md5"
-	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
-	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -22,7 +18,6 @@ var RED, GREEN, YELLEW, BLUE, PINK, RES = "\x1b\\[1;41m", "\x1b\\[1;42m", "\x1b\
 var progress = make(map[[16]byte]float64)
 var llReg = regexp.MustCompile(GREEN + "successfully" + RES + " generated '" + BLUE + "(.*?)" + RES)
 var smReg = regexp.MustCompile("'(.*?)' '(.*?)' (.*?) (.*?) (.*?) (.*?) '(.*?)' '(.*?)' (.*)")
-var dataDir = "./data/"
 
 type cmpRes struct {
 	Func1, Func2, File1, File2 string
@@ -31,18 +26,10 @@ type cmpRes struct {
 }
 
 func pong(c *gin.Context) {
-	body, _ := ioutil.ReadAll(c.Request.Body)
-	fmt.Println("---body/--- \r\n " + string(body))
-	fmt.Println("---header/--- \r\n")
-	for k, v := range c.Request.Header {
-		fmt.Println(k, v)
-	}
-	fmt.Printf("ip=%v\nua=%v\n", c.ClientIP, c.Request.Header["User-Agent"])
 	c.String(http.StatusOK, "pong!")
 }
 
 func draw(c *gin.Context) {
-	// cookie, _ := c.Cookie("shavds")
 	file := c.Query("file")
 	tp := c.Query("type")
 	cmd1 := exec.Command("./core/gen.sh", "-O0", "-g", file)
@@ -199,58 +186,12 @@ func getProgress(c *gin.Context) {
 		"data":    progress[hash(file1, file2)]})
 }
 
-func genCookie(c *gin.Context) string {
-	ip := c.ClientIP()
-	ua := c.Request.Header["User-Agent"][0]
-	t := time.Now().UnixNano()
-	x := ip + ua + string(t)
-	return fmt.Sprintf("%x", md5.Sum([]byte(x)))
-}
-
-func upload(c *gin.Context) {
-	cookie, err := c.Cookie("shavds")
-	if err != nil {
-		cookie = genCookie(c)
-		c.SetCookie("shavds", cookie, 3600*24*7, "/", "localhost", false, true)
-	}
-	os.Mkdir(dataDir+cookie, os.ModePerm)
-	form, err := c.MultipartForm()
-	if err != nil {
-		fmt.Println("获取多个文件出错", err)
-		c.JSON(http.StatusOK, gin.H{
-			"success": false,
-			"data":    0,
-			"msg":     err,
-		})
-		return
-	}
-	files := form.File["files"]
-	fmt.Println(files)
-	for _, file := range files {
-		path := file.Filename
-		err := c.SaveUploadedFile(file, `./data/`+cookie+`/`+path)
-		if err != nil {
-			fmt.Println("保存出错", err)
-			c.JSON(http.StatusOK, gin.H{
-				"success": false,
-				"data":    0,
-				"msg":     err,
-			})
-			return
-		}
-		fmt.Printf("get %s %d\n", path, file.Size)
-	}
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    len(files),
-	})
-}
-
 func main() {
-	os.Mkdir(dataDir, os.ModePerm)
+	// cmd1 := exec.Command("pwd")
+	// out1, _ := cmd1.Output()
+	// fmt.Println(string(out1))
 	r := gin.Default()
 	r.GET("/ping", pong)
-	r.POST("/upload", upload)
 	r.GET("/draw", draw)
 	r.GET("/cmpfun", cmpfun)
 	r.GET("/cmpcfg", cmpcfg)
