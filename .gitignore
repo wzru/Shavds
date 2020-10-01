@@ -5,10 +5,14 @@
 
 *.so
 *.lib
+*.exe
 
 samples/**/*.png
 samples/**/*.jpg
 samples/**/*.jpeg
+
+nohup.out
+shavds-server
 
 .vscode/
 .idea/

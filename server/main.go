@@ -75,7 +75,7 @@ func draw(c *gin.Context) {
 	file := c.Query("file")
 	tp := c.Query("type")
 	cmd1 := exec.Command("./core/gen.sh", "-O0", "-g", dir+file)
-	// fmt.Println(cmd1.String())
+	fmt.Println(cmd1.String())
 	out1, _ := cmd1.Output()
 	reg := regexp.MustCompile(`successfully generated \'(?s:(.*?))\'`)
 	res := (reg.FindAllStringSubmatch(string(out1), -1))
@@ -84,7 +84,7 @@ func draw(c *gin.Context) {
 		ll = text[1]
 	}
 	cmd2 := exec.Command("./core/draw.sh", "-T", tp, ll)
-	// fmt.Println(cmd2.String())
+	fmt.Println(cmd2.String())
 	out2, _ := cmd2.Output()
 	res = reg.FindAllStringSubmatch(string(out2), -1)
 	imgs := []string{}
@@ -119,11 +119,13 @@ func cmpfun(c *gin.Context) {
 	data := []cmpRes{}
 	progress[h] = 0
 	cmd1 := exec.Command("./core/gen.sh", "-O3", "-g", file1, file2)
+	fmt.Println(cmd1.String())
 	out1, _ := cmd1.Output()
 	res := cllReg.FindStringSubmatch(string(out1))
 	ll := res[1]
 	// fmt.Printf("ll=%v\n", ll)
 	cmd2 := exec.Command("./core/shavds.sh", "cmpfun", ll)
+	fmt.Println(cmd2.String())
 	buf := make([]byte, 1024)
 	stderr, _ := cmd2.StderrPipe()
 	cmd2.Start()
@@ -188,6 +190,7 @@ func cmpcfg(c *gin.Context) {
 	data := []cmpRes{}
 	progress[h] = 0
 	cmd1 := exec.Command("./core/gen.sh", "-O3", "-g", file1, file2)
+	fmt.Println(cmd1.String())
 	out1, _ := cmd1.Output()
 	// fmt.Printf("out1=%v\n", string(out1))
 	// fmt.Printf("out1=%v\n", out1)
@@ -197,6 +200,7 @@ func cmpcfg(c *gin.Context) {
 	// fmt.Printf("ll=%v\nreg=%v\n", ll, cllReg.String())
 	// fmt.Printf("reg=%v\n", reg.String())
 	cmd2 := exec.Command("./core/shavds.sh", "cmpcfg", ll)
+	fmt.Println(cmd2.String())
 	buf := make([]byte, 1024)
 	stderr, _ := cmd2.StderrPipe()
 	cmd2.Start()
@@ -286,10 +290,12 @@ func genCookie(c *gin.Context) string {
 // curl example:
 // curl -F "files=@./func1.cpp" -F "files=@./func2.cpp"  http://localhost:7000/upload
 func upload(c *gin.Context) {
+	// printHTTP(c)
 	cookie, err := c.Cookie("shavds")
+	// fmt.Printf("host=%v\n", c.Request.Host)
 	if err != nil {
 		cookie = genCookie(c)
-		c.SetCookie("shavds", cookie, 3600*24*30, "/", "localhost", false, true)
+		c.SetCookie("shavds", cookie, 3600*24*30, "/", c.Request.Host, false, true)
 	}
 	os.Mkdir(dataDir+cookie, os.ModePerm)
 	form, err := c.MultipartForm()
@@ -473,5 +479,5 @@ func main() {
 	r.GET("/cmpcfg", cmpcfg)
 	r.GET("/progress", getProgress)
 	r.GET("/detect", detect)
-	r.Run("0.0.0.0:7000")
+	r.Run(":7000")
 }
