@@ -1,0 +1,24 @@
+.index {
+  @include flex-col;
+  height: 100%;
+  width: 20%;
+  border: 2px solid $line-grey;
+}
+.header {
+  @include flex-row;
+  justify-content: space-between;
+  width: 100%;
+}
+.header-icons-item {
+  height: $small-icon;
+  width: $small-icon;
+}
+.list {
+  width: 90%;
+}
+.list-item {
+  width: 100%;
+  height: 40px;
+  line-height: 40px;
+  border-bottom: 1px solid $line-grey;
+}
