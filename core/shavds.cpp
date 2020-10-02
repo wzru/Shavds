@@ -7,8 +7,10 @@
 #include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/DebugLoc.h"
 #include "llvm/IR/Function.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/InstrTypes.h"
+#include "llvm/IR/Instructions.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Pass.h"
@@ -19,6 +21,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/type_traits.h"
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 #include <algorithm>
 #include <cassert>
@@ -394,10 +397,21 @@ struct CfgComparator : public ModulePass
 struct Detector : public ModulePass
 {
     static char                    ID;
-    const std::vector<std::string> VulFuncNames{
-        "strcpy",  "strcpy", "strncpy", "memcpy", "memncpy", "strcat", "strncat", "sprintf", "vsprintf", "gets",
-        "getchar", "fgetc",  "getc",    "read",   "sscanf",  "fscanf", "vfscanf", "vscanf",  "vsscanf"};
+    LLVMContext*                   C;
+    Value*                         logFunc;
+    Type*                          VoidTy;
+    Type*                          Int32Ty;
+    const std::vector<std::string> VulFuncNames{"strcpy",  "strcpy",   "strncpy", "memcpy",  "strcat", "strncat",
+                                                "sprintf", "vsprintf", "gets",    "getchar", "fgetc",  "getc",
+                                                "read",    "sscanf",   "fscanf",  "vfscanf", "vscanf", "vsscanf"};
     Detector() : ModulePass(ID) {}
+    void init(Module& M)
+    {
+        C       = &(M.getContext());
+        VoidTy  = Type::getVoidTy(*C);
+        Int32Ty = Type::getInt32Ty(*C);
+        // logFunc = M.getOrInsertFunction("logop", VoidTy, Int32Ty, NULL);
+    }
     bool isVur(const std::string& name)
     {
         for (auto i : VulFuncNames) {
@@ -405,22 +419,127 @@ struct Detector : public ModulePass
         }
         return false;
     }
+    void findOperand(Value* itVal)
+    {
+        std::stack<Value*> st;
+        st.push(itVal);
+        while (!st.empty()) {
+            auto ele = st.top();
+            st.pop();
+
+            if (isa<Instruction>(ele)) {
+                Instruction* tip = (Instruction*)ele;
+                if (isa<AllocaInst>(tip)) {
+                    errs() << "others\n";
+                    // opdSet.insert(ele);
+                }
+                else if (isa<LoadInst>(tip)) {
+                    Value* ti = tip->getOperand(0);
+                    if (!isa<ConstantData>(ti)) st.push(ti);
+                }
+                else if (isa<CallInst>(tip)) {
+                    Function* calledFp = cast<CallInst>(tip)->getCalledFunction();
+                    errs() << calledFp->getName() << "\n";
+                    if (calledFp->getName() == "malloc" || calledFp->getName() == "_Znwm") {
+                        errs() << "Dynamic memory allocation!\n";
+                        errs() << tip->getNumOperands() << "\n";
+                        errs() << tip->getOperand(0) << "\n";
+                    }
+                    else {
+                        // fetch the last bb of the function
+                        auto bb = calledFp->end();
+                        if (bb != calledFp->begin()) {
+                            bb--;
+                            BasicBlock* bp = &(*bb);
+                            // fetch the terminator
+                            Instruction* term = bp->getTerminator();
+                            if (isa<ReturnInst>(term)) {
+                                // find Operand
+                                findOperand(term->getOperand(0));
+                                errs() << "done\n";
+                            }
+                        }
+                    }
+                }
+                else {
+                    for (int i = 0, numOp = tip->getNumOperands(); i < numOp; i++) {
+                        Value* ti = tip->getOperand(i);
+                        if (!isa<ConstantData>(ti)) { st.push(ti); }
+                    }
+                }
+            }
+            else if (isa<GlobalVariable>(ele)) {
+                errs() << "others\n";
+            }
+        }
+
+    }  // findOperand
+    void visitStoreInst(StoreInst& ip)
+    {
+        Value* lhs = ip.getOperand(1);
+        Value* rhs = ip.getOperand(0);
+        if (lhs->getType()->getContainedType(0)->isPointerTy()) {
+            // figure out rhs
+            errs() << "pointer assignment!" << lhs->getName() << "\n";
+            findOperand(rhs);
+        }
+    }
+    Value* getLineNum(Instruction* I)
+    {
+        const DebugLoc* debugLoc = &I->getDebugLoc();
+        if (debugLoc) return ConstantInt::get(Int32Ty, debugLoc->getLine());
+        return ConstantInt::get(Int32Ty, -1);
+    }
     bool runOnModule(Module& M)
     {
-        for (Module::iterator F = M.begin(); F != M.end(); ++F) {
-            for (Function::iterator B = F->begin(); B != F->end(); ++B)  //获取每个函数中的basic block
-            {
-                // std::cerr << "Basic block name=" << B->getName().str() << std::endl;
-                for (BasicBlock::iterator i = B->begin(); i != B->end(); ++i)  //获取每个basic block中的instruction
-                {
-                    for (auto op = i->op_begin(); op != i->op_end(); ++op) {
+        bool res = false;
+        init(M);
+        for (Function& F : M) {
+            for (BasicBlock& B : F) {
+                for (Instruction& I : B) {
+                    if (auto* op = dyn_cast<BinaryOperator>(&I)) {
+                        // TODO: Implement the shouldCheckOverflow() function.
+                        // if (!shouldCheckOverflow(&I, 0)) continue;
+                        errs() << "Instrument: " << I << "\n";
+                        // Insert call instruction *after* `op`.
+                        // TODO: Pass more information including operands of computations.
+                        IRBuilder<> builder(op);
+                        builder.SetInsertPoint(&B, ++builder.GetInsertPoint());
+                        Value* args[] = {op, getLineNum(&I)};
+                        builder.CreateCall(logFunc, args);
+                        res |= true;
+                    }
+                    //------------------------------------------
+                    // StoreInst* store_inst = dyn_cast<StoreInst>(&I);
+                    // if (store_inst != nullptr) { visitStoreInst(*store_inst); }
+                    // if (I.op_end() - I.op_begin() < 3) continue;
+                    // errs() << "cnt=" << (I.op_end() - I.op_begin()) << "\n";
+                    for (auto op = I.op_begin(); op != I.op_end(); ++op) {
+                        // op->get()->printAsOperand(errs());
+                        // errs() << "\n";
+                        // errs() << "\tNO." << op->getOperandNo() << "\n";
+                        // errs() << "\tname=" << op->get()->getName() << "\n";
+                        // errs() << "\tnum-uses=" << op->get()->getNumUses() << "\n";
+                        for (auto u = op->get()->use_begin(); u != op->get()->use_end(); ++u) {
+                            // errs() << *(u->get()->getType()) << "\n";
+                            auto v = u->get()->getValueName();
+                            // errs() << "name=" << op->get()->getName() << "\n";
+                            // errs() << "vid=" << u->get()->getValueID() << "\n";
+                            // if (v != nullptr) { errs() << "val=" << v->getValue() << "\n"; }
+                        }
+                        // errs() << "\ttype=" << op->get()->printAsOperand(errs()) << "\n";
+                        // I.op_begin();
                         if (isVur(op->get()->getName())) {
                             // errs() << "overflow " << F->getSubprogram()->getLine() << "\n";
-                            errs() << "overflow " << i->getDebugLoc().getLine() << " " << i->getDebugLoc().getCol()
+                            // CallInst* call_inst = dyn_cast<CallInst>(&I);
+                            // Function* fn        = call_inst->getCalledFunction();
+                            // for (auto arg = fn->arg_begin(); arg != fn->arg_end(); ++arg) {
+                            //     if (auto* ci = dyn_cast<ConstantInt>(arg)) errs() << ci->getValue() << "\n";
+                            //     errs() << *arg << "\n";
+                            // }
+                            errs() << "overflow " << I.getDebugLoc().getLine() << " " << I.getDebugLoc().getCol()
                                    << "\n";
                         }
-                        // errs() << "no=" << op->getOperandNo() << "\n";
-                        // errs() << "name=" << op->get()->getName() << "\n";
                     }
                     // errs() << *i << "\n";
                     // Instruction* inst = &(*i);
