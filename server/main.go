@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 )
 
@@ -27,6 +28,13 @@ var llReg = regexp.MustCompile("successfully generated '(.*)'")
 var cmpReg = regexp.MustCompile("'(.*?)' '(.*?)' (.*?) (.*?) (.*?) (.*?) '(.*?)' '(.*?)' (.*)")
 var dataDir = "./data/"
 var codeExts = []string{".cpp", ".c", ".go", ".cc", ".cxx"}
+
+type result struct {
+	Success bool        `json:"success"`
+	Data    interface{} `json:"data"`
+	Msg     string      `json:"msg"`
+	Code    int         `json:"code"`
+}
 
 type cmpRes struct {
 	Func1 string  `json:"func1"`
@@ -44,6 +52,25 @@ type vulRes struct {
 	Type string `json:"type"`
 	Line int    `json:"line"`
 	Col  int    `json:"column"`
+}
+
+func cors() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		origin := c.Request.Header.Get("origin")
+		if len(origin) == 0 {
+			origin = c.Request.Header.Get("Origin")
+		}
+		c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "OPTIONS, GET, POST, DELETE")
+		c.Writer.Header().Set("Content-Type", "application/json; charset=utf-8")
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+		c.Next()
+	}
 }
 
 func printHTTP(c *gin.Context) {
@@ -290,14 +317,25 @@ func genCookie(c *gin.Context) string {
 // curl example:
 // curl -F "files=@./func1.cpp" -F "files=@./func2.cpp"  http://localhost:7000/upload
 func upload(c *gin.Context) {
-	// printHTTP(c)
-	cookie, err := c.Cookie("shavds")
-	// fmt.Printf("host=%v\n", c.Request.Host)
-	if err != nil {
-		cookie = genCookie(c)
-		c.SetCookie("shavds", cookie, 3600*24*30, "/", c.Request.Host, false, true)
+	var clm *jwt.StandardClaims
+	var err error
+	token := ""
+	auth := c.Request.Header.Get("Authorization")
+	if len(auth) == 0 {
+		token = genJWT(c)
+		// fmt.Printf("token=%v\n", token)
+		clm, _ = parseToken(token)
+	} else {
+		auth = strings.Fields(auth)[1]
+		clm, err = parseToken(auth)
+		if err != nil {
+			token = genJWT(c)
+			clm, _ = parseToken(strings.Fields(token)[1])
+		}
 	}
-	os.Mkdir(dataDir+cookie, os.ModePerm)
+	name := clm.Id
+	// fmt.Printf("name=%v\n", name)
+	os.Mkdir(dataDir+name, os.ModePerm)
 	form, err := c.MultipartForm()
 	if err != nil {
 		fmt.Println("获取多个文件出错", err)
@@ -312,7 +350,7 @@ func upload(c *gin.Context) {
 	fmt.Println(files)
 	for _, file := range files {
 		path := file.Filename
-		err := c.SaveUploadedFile(file, `./data/`+cookie+`/`+path)
+		err := c.SaveUploadedFile(file, `./data/`+name+`/`+path)
 		if err != nil {
 			fmt.Println("保存出错", err)
 			c.JSON(http.StatusOK, gin.H{
@@ -326,35 +364,23 @@ func upload(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"data":    len(files),
+		"data":    token,
 	})
 }
 
 func getFile(c *gin.Context) {
-	cookie, _ := c.Cookie("shavds")
-	if cookie == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"success": false,
-			"data":    nil,
-			"msg":     "缺少cookie",
-		})
-		return
-	}
-	file := dataDir + cookie + "/" + c.Param("file")
+	auth := strings.Fields(c.Request.Header.Get("Authorization"))[1]
+	clm, _ := parseToken(auth)
+	name := clm.Id
+	file := dataDir + name + "/" + c.Param("file")
 	c.File(file)
 }
 
 func delFile(c *gin.Context) {
-	cookie, _ := c.Cookie("shavds")
-	if cookie == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"success": false,
-			"data":    nil,
-			"msg":     "缺少cookie",
-		})
-		return
-	}
-	file := dataDir + cookie + "/" + c.Param("file")
+	auth := strings.Fields(c.Request.Header.Get("Authorization"))[1]
+	clm, _ := parseToken(auth)
+	name := clm.Id
+	file := dataDir + name + "/" + c.Param("file")
 	os.Remove(file)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -363,16 +389,10 @@ func delFile(c *gin.Context) {
 }
 
 func delFiles(c *gin.Context) {
-	cookie, _ := c.Cookie("shavds")
-	if cookie == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"success": false,
-			"data":    nil,
-			"msg":     "缺少cookie",
-		})
-		return
-	}
-	os.RemoveAll(dataDir + cookie + "/")
+	auth := strings.Fields(c.Request.Header.Get("Authorization"))[1]
+	clm, _ := parseToken(auth)
+	name := clm.Id
+	os.RemoveAll(dataDir + name + "/")
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data":    nil,
@@ -390,16 +410,10 @@ func isCodeExt(file string) bool {
 }
 
 func getList(c *gin.Context) {
-	cookie, _ := c.Cookie("shavds")
-	if cookie == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"success": false,
-			"data":    nil,
-			"msg":     "缺少cookie",
-		})
-		return
-	}
-	dir := dataDir + cookie + "/"
+	auth := strings.Fields(c.Request.Header.Get("Authorization"))[1]
+	clm, _ := parseToken(auth)
+	name := clm.Id
+	dir := dataDir + name + "/"
 	rd, _ := ioutil.ReadDir(dir)
 	var files []string
 	for _, file := range rd {
@@ -415,16 +429,10 @@ func getList(c *gin.Context) {
 }
 
 func detect(c *gin.Context) {
-	cookie, _ := c.Cookie("shavds")
-	if cookie == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"success": false,
-			"data":    nil,
-			"msg":     "缺少cookie",
-		})
-		return
-	}
-	dir := dataDir + cookie + "/"
+	auth := strings.Fields(c.Request.Header.Get("Authorization"))[1]
+	clm, _ := parseToken(auth)
+	name := clm.Id
+	dir := dataDir + name + "/"
 	file := dir + c.Query("file")
 	cmd1 := exec.Command("./core/gen.sh", "-O0", "-g", file)
 	out1, _ := cmd1.Output()
@@ -468,16 +476,20 @@ func detect(c *gin.Context) {
 func main() {
 	os.Mkdir(dataDir, os.ModePerm)
 	r := gin.Default()
+	r.Use(cors())
 	r.GET("/ping", pong)
 	r.POST("/upload", upload)
-	r.GET("/list", getList)
-	r.GET("/file/:file", getFile)
-	r.DELETE("/file/:file", delFile)
-	r.DELETE("/files", delFiles)
-	r.POST("/draw", draw)
-	r.GET("/cmpfun", cmpfun)
-	r.GET("/cmpcfg", cmpcfg)
-	r.GET("/progress", getProgress)
-	r.GET("/detect", detect)
+	r.Group("", authJWT())
+	{
+		r.GET("/list", getList)
+		r.GET("/file/:file", getFile)
+		r.DELETE("/file/:file", delFile)
+		r.DELETE("/files", delFiles)
+		r.POST("/draw", draw)
+		r.GET("/cmpfun", cmpfun)
+		r.GET("/cmpcfg", cmpcfg)
+		r.GET("/progress", getProgress)
+		r.GET("/detect", detect)
+	}
 	r.Run(":7000")
 }
