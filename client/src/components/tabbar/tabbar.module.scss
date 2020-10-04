@@ -1,0 +1,5 @@
+.index {
+  @include flex-col;
+  justify-content: space-evenly;
+  height: 100%;
+}
