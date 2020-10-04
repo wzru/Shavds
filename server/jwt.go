@@ -15,20 +15,24 @@ func authJWT() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		result := result{
 			Success: false,
-			Code:    http.StatusUnauthorized,
-			Msg:     "Unauthorized",
-			Data:    nil,
+			// Code:    http.StatusUnauthorized,
+			Msg:  "Unauthorized",
+			Data: nil,
 		}
 		auth := ctx.Request.Header.Get("Authorization")
+		// fmt.Printf("auth jwt=%v\n", auth)
 		if len(auth) == 0 {
-			ctx.Abort()
+			// fmt.Printf("auth jwt2=%v\n", auth)
 			ctx.JSON(http.StatusUnauthorized, result)
+			ctx.Abort()
+			return
 		}
 		auth = strings.Fields(auth)[1]
 		_, err := parseToken(auth) // 校验token
 		if err != nil {
-			ctx.Abort()
 			ctx.JSON(http.StatusUnauthorized, result)
+			ctx.Abort()
+			return
 		}
 		ctx.Next()
 	}

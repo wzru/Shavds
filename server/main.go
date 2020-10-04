@@ -33,7 +33,6 @@ type result struct {
 	Success bool        `json:"success"`
 	Data    interface{} `json:"data"`
 	Msg     string      `json:"msg"`
-	Code    int         `json:"code"`
 }
 
 type cmpRes struct {
@@ -89,16 +88,10 @@ func pong(c *gin.Context) {
 }
 
 func draw(c *gin.Context) {
-	cookie, _ := c.Cookie("shavds")
-	if cookie == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"success": false,
-			"data":    nil,
-			"msg":     "缺少cookie",
-		})
-		return
-	}
-	dir := dataDir + cookie + "/"
+	auth := strings.Fields(c.Request.Header.Get("Authorization"))[1]
+	clm, _ := parseToken(auth)
+	name := clm.Id
+	dir := dataDir + name + "/"
 	file := c.Query("file")
 	tp := c.Query("type")
 	cmd1 := exec.Command("./core/gen.sh", "-O0", "-g", dir+file)
@@ -130,16 +123,10 @@ func draw(c *gin.Context) {
 }
 
 func cmpfun(c *gin.Context) {
-	cookie, _ := c.Cookie("shavds")
-	if cookie == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"success": false,
-			"data":    nil,
-			"msg":     "缺少cookie",
-		})
-		return
-	}
-	dir := dataDir + cookie + "/"
+	auth := strings.Fields(c.Request.Header.Get("Authorization"))[1]
+	clm, _ := parseToken(auth)
+	name := clm.Id
+	dir := dataDir + name + "/"
 	file1 := dir + c.Query("file1")
 	file2 := dir + c.Query("file2")
 	h := hash(file1, file2)
@@ -200,16 +187,10 @@ func cmpfun(c *gin.Context) {
 }
 
 func cmpcfg(c *gin.Context) {
-	cookie, _ := c.Cookie("shavds")
-	if cookie == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"success": false,
-			"data":    nil,
-			"msg":     "缺少cookie",
-		})
-		return
-	}
-	dir := dataDir + cookie + "/"
+	auth := strings.Fields(c.Request.Header.Get("Authorization"))[1]
+	clm, _ := parseToken(auth)
+	name := clm.Id
+	dir := dataDir + name + "/"
 	file1 := dir + c.Query("file1")
 	file2 := dir + c.Query("file2")
 	h := hash(file1, file2)
@@ -288,16 +269,10 @@ func hash(s1 string, s2 string) [16]byte {
 }
 
 func getProgress(c *gin.Context) {
-	cookie, _ := c.Cookie("shavds")
-	if cookie == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"success": false,
-			"data":    nil,
-			"msg":     "缺少cookie",
-		})
-		return
-	}
-	dir := dataDir + cookie + "/"
+	auth := strings.Fields(c.Request.Header.Get("Authorization"))[1]
+	clm, _ := parseToken(auth)
+	name := clm.Id
+	dir := dataDir + name + "/"
 	file1 := dir + c.Query("file1")
 	file2 := dir + c.Query("file2")
 	// fmt.Printf("hash=%v\n", hash(file1, file2))
@@ -326,15 +301,15 @@ func upload(c *gin.Context) {
 		// fmt.Printf("token=%v\n", token)
 		clm, _ = parseToken(token)
 	} else {
-		auth = strings.Fields(auth)[1]
-		clm, err = parseToken(auth)
+		token = strings.Fields(auth)[1]
+		clm, err = parseToken(token)
 		if err != nil {
 			token = genJWT(c)
-			clm, _ = parseToken(strings.Fields(token)[1])
+			clm, _ = parseToken(token)
 		}
 	}
 	name := clm.Id
-	// fmt.Printf("name=%v\n", name)
+	fmt.Printf("name=%v\n", name)
 	os.Mkdir(dataDir+name, os.ModePerm)
 	form, err := c.MultipartForm()
 	if err != nil {
@@ -479,17 +454,18 @@ func main() {
 	r.Use(cors())
 	r.GET("/ping", pong)
 	r.POST("/upload", upload)
-	r.Group("", authJWT())
+	g := r.Group("/")
+	g.Use(authJWT())
 	{
-		r.GET("/list", getList)
-		r.GET("/file/:file", getFile)
-		r.DELETE("/file/:file", delFile)
-		r.DELETE("/files", delFiles)
-		r.POST("/draw", draw)
-		r.GET("/cmpfun", cmpfun)
-		r.GET("/cmpcfg", cmpcfg)
-		r.GET("/progress", getProgress)
-		r.GET("/detect", detect)
+		g.GET("/list", getList)
+		g.GET("/file/:file", getFile)
+		g.DELETE("/file/:file", delFile)
+		g.DELETE("/files", delFiles)
+		g.POST("/draw", draw)
+		g.GET("/cmpfun", cmpfun)
+		g.GET("/cmpcfg", cmpcfg)
+		g.GET("/progress", getProgress)
+		g.GET("/detect", detect)
 	}
 	r.Run(":7000")
 }
