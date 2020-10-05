@@ -412,12 +412,28 @@ struct Detector : public ModulePass
         Int32Ty = Type::getInt32Ty(*C);
         // logFunc = M.getOrInsertFunction("logop", VoidTy, Int32Ty, NULL);
     }
-    bool isVur(const std::string& name)
+    bool isBufVul(const std::string& name)  //缓冲区溢出漏洞
     {
         for (auto i : VulFuncNames) {
             if (i == name) return true;
         }
         return false;
+    }
+    bool isIntWidthVul(const std::string& name)  //整数宽度溢出漏洞
+    {
+        return name.find("__ubsan_handle_implicit_conversion") != std::string::npos;
+    }
+    bool isIntOpVul(const std::string& name)  //整数运算溢出漏洞
+    {
+        return name.find("with.overflow") != std::string::npos;
+    }
+    bool isIntSgnVul(const std::string& name)  //整数符号溢出漏洞
+    {
+        return name.find("__ubsan_handle_implicit_conversion") != std::string::npos;
+    }
+    bool isPtrNullVul(const std::string& name)  //空指针漏洞
+    {
+        return name.find("__ubsan_handle_type_mismatch") != std::string::npos;
     }
     void findOperand(Value* itVal)
     {
@@ -493,56 +509,32 @@ struct Detector : public ModulePass
     bool runOnModule(Module& M)
     {
         bool res = false;
-        init(M);
+        // init(M);
         for (Function& F : M) {
             for (BasicBlock& B : F) {
                 for (Instruction& I : B) {
-                    if (auto* op = dyn_cast<BinaryOperator>(&I)) {
-                        // TODO: Implement the shouldCheckOverflow() function.
-                        // if (!shouldCheckOverflow(&I, 0)) continue;
-                        errs() << "Instrument: " << I << "\n";
-                        // Insert call instruction *after* `op`.
-                        // TODO: Pass more information including operands of computations.
-                        IRBuilder<> builder(op);
-                        builder.SetInsertPoint(&B, ++builder.GetInsertPoint());
-                        Value* args[] = {op, getLineNum(&I)};
-                        builder.CreateCall(logFunc, args);
-                        res |= true;
-                    }
-                    //------------------------------------------
-                    // StoreInst* store_inst = dyn_cast<StoreInst>(&I);
-                    // if (store_inst != nullptr) { visitStoreInst(*store_inst); }
-                    // if (I.op_end() - I.op_begin() < 3) continue;
-                    // errs() << "cnt=" << (I.op_end() - I.op_begin()) << "\n";
                     for (auto op = I.op_begin(); op != I.op_end(); ++op) {
-                        // op->get()->printAsOperand(errs());
-                        // errs() << "\n";
-                        // errs() << "\tNO." << op->getOperandNo() << "\n";
-                        // errs() << "\tname=" << op->get()->getName() << "\n";
-                        // errs() << "\tnum-uses=" << op->get()->getNumUses() << "\n";
-                        for (auto u = op->get()->use_begin(); u != op->get()->use_end(); ++u) {
-                            // errs() << *(u->get()->getType()) << "\n";
-                            auto v = u->get()->getValueName();
-                            // errs() << "name=" << op->get()->getName() << "\n";
-                            // errs() << "vid=" << u->get()->getValueID() << "\n";
-                            // if (v != nullptr) { errs() << "val=" << v->getValue() << "\n"; }
+                        if (isBufVul(op->get()->getName())) {
+                            errs() << "buffer-overflow " << I.getDebugLoc().getLine() << " " << I.getDebugLoc().getCol()
+                                   << "\n";
                         }
-                        // errs() << "\ttype=" << op->get()->printAsOperand(errs()) << "\n";
-                        // I.op_begin();
-                        if (isVur(op->get()->getName())) {
-                            // errs() << "overflow " << F->getSubprogram()->getLine() << "\n";
-                            // CallInst* call_inst = dyn_cast<CallInst>(&I);
-                            // Function* fn        = call_inst->getCalledFunction();
-                            // for (auto arg = fn->arg_begin(); arg != fn->arg_end(); ++arg) {
-                            //     if (auto* ci = dyn_cast<ConstantInt>(arg)) errs() << ci->getValue() << "\n";
-                            //     errs() << *arg << "\n";
-                            // }
-                            errs() << "overflow " << I.getDebugLoc().getLine() << " " << I.getDebugLoc().getCol()
+                        if (isIntWidthVul(op->get()->getName())) {
+                            errs() << "integer-width-overflow " << I.getDebugLoc().getLine() << " "
+                                   << I.getDebugLoc().getCol() << "\n";
+                        }
+                        if (isIntOpVul(op->get()->getName())) {
+                            errs() << "integer-operate-overflow " << I.getDebugLoc().getLine() << " "
+                                   << I.getDebugLoc().getCol() << "\n";
+                        }
+                        if (isIntSgnVul(op->get()->getName())) {
+                            errs() << "integer-sign-overflow " << I.getDebugLoc().getLine() << " "
+                                   << I.getDebugLoc().getCol() << "\n";
+                        }
+                        if (isPtrNullVul(op->get()->getName())) {
+                            errs() << "pointer-null " << I.getDebugLoc().getLine() << " " << I.getDebugLoc().getCol()
                                    << "\n";
                         }
                     }
-                    // errs() << *i << "\n";
-                    // Instruction* inst = &(*i);
                 }
             }
         }

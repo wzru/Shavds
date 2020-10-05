@@ -10,7 +10,8 @@ if [ $# -ge 2 ]
 then
     optm=-O3
     dbg=
-    while getopts "O:g" opt
+    f=
+    while getopts "O:gf:" opt
     do
         case $opt in
             O)
@@ -18,6 +19,9 @@ then
                 ;;
             g)
                 dbg=-g
+                ;;
+            f)
+                f=-f$OPTARG
                 ;;
             ?)
                 echo -e "there is some ${RED}unrecognized${RES} parameters"
@@ -31,7 +35,8 @@ then
     for file in $@
     do
         echo "processing '${file}'..."
-        clang++ $file $optm $dbg -S -emit-llvm -o ${file%.*}.ll
+        clang++ $file $optm $dbg $f -S -emit-llvm -o ${file%.*}.ll
+        # echo "clang++ $file $optm $dbg $f -S -emit-llvm -o ${file%.*}.ll"
         if [ $? -ne 0 ]
         then
             echo -e "${RED}failed${RES} to process '${file}'"
