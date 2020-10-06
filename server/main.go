@@ -409,7 +409,7 @@ func detect(c *gin.Context) {
 	name := clm.Id
 	dir := dataDir + name + "/"
 	file := dir + c.Query("file")
-	cmd1 := exec.Command("./core/gen.sh", "-O0", "-g", "-fsanitize=implicit-integer-truncation,signed-integer-overflow,implicit-integer-sign-change,null", file)
+	cmd1 := exec.Command("./core/gen.sh", "-O2", "-g", "-fsanitize=implicit-integer-truncation,signed-integer-overflow,implicit-integer-sign-change,null", file)
 	out1, _ := cmd1.Output()
 	// fmt.Printf("out1=%v\n", string(out1))
 	res := llReg.FindStringSubmatch(string(out1))

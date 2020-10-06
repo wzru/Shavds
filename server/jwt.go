@@ -40,10 +40,11 @@ func authJWT() gin.HandlerFunc {
 
 func genJWT(c *gin.Context) string {
 	now := time.Now().Unix()
+	cookie := genCookie(c)
 	claims := jwt.StandardClaims{
-		Audience:  genCookie(c),             // 受众
+		Audience:  cookie,                   // 受众
 		ExpiresAt: now + int64(3600*24*365), // 失效时间
-		Id:        genCookie(c),             // 编号
+		Id:        cookie,                   // 编号
 		IssuedAt:  now,                      // 签发时间
 		Issuer:    "Shavds",                 // 签发人
 		NotBefore: now,                      // 生效时间
