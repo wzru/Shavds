@@ -10,7 +10,7 @@ Shavds [ʃeɪvz]
 1. 使用字符串匹配进行同源性检测
 2. 使用控制流程图CFG进行同源性检测
 
-- [x] 跨语言(4种以上)同源性检测
+- [ ] 跨语言(4种以上)同源性检测
 - [x] 分布式任务调度
 
 ## 代码漏洞检测
@@ -25,9 +25,11 @@ Shavds [ʃeɪvz]
 - [x] 空指针引用
 - [ ] 竞争性条件
 
-| 栈/堆缓冲区溢出漏洞 | buffer-overflow          |                                         |
+| 漏洞                | 返回漏洞类型             | clang参数                               |
 | ------------------- | ------------------------ | --------------------------------------- |
+| 栈/堆缓冲区溢出漏洞 | buffer-overflow          |                                         |
 | 整数宽度溢出漏洞    | integer-width-overflow   | -fsanitize=implicit-integer-truncation  |
 | 整数运算溢出漏洞    | integer-operate-overflow | -fsanitize=signed-integer-overflow      |
 | 整数符号溢出漏洞    | integer-sign-overflow    | -fsanitize=implicit-integer-sign-change |
 | 空指针引用漏洞      | pointer-null             | -fsanitize=null                         |
+| 格式化字符串漏洞    | format-string            |                                         |
