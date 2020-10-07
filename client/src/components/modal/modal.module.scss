@@ -1,0 +1,54 @@
+.mask {
+  position: fixed;
+  top: 0;
+  background-color: rgba($color: #000000, $alpha: 0.3);
+  height: 100%;
+  width: 100%;
+  z-index: 1026;
+}
+.modal {
+  position: fixed;
+  top: 40%;
+  left: 40%;
+  z-index: 1027;
+  height: 20%;
+  width: 20%;
+  background-color: white;
+  border-radius: 20px;
+}
+.title {
+  @include flex-col;
+  justify-content: center;
+  width: 100%;
+  border-bottom: 1px $border-grey solid;
+  font-size: 150%;
+  font-weight: bold;
+  height: 40px;
+  box-sizing: border-box;
+}
+.content {
+  @include flex-row;
+  justify-content: center;
+  height: calc(100% - 90px);
+  font-size: 110%;
+}
+.bottom {
+  @include flex-row;
+  height: 50px;
+  border-top: 1px solid $border-grey;
+  cursor: pointer;
+}
+.bottom-item {
+  @include flex-row;
+  justify-content: center;
+  width: 50%;
+  height: 100%;
+  font-size: 120%;
+}
+.cancel {
+  color: $font-grey;
+  border-right: 1px solid $border-grey;
+}
+.confirm {
+  color: $blue;
+}

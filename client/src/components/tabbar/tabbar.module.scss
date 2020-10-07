@@ -1,5 +1,16 @@
 .index {
   @include flex-col;
-  justify-content: space-evenly;
+  justify-content: flex-start;
   height: 100%;
+  width: 80px;
+  background-color: #c3c7cd;
+}
+.button {
+  margin: 10px 0;
+  cursor: pointer;
+  text-align: center;
+}
+.button img {
+  height: $middle-icon;
+  width: $middle-icon;
 }

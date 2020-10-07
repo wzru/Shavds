@@ -1,5 +1,11 @@
 .index {
-  width: 40%;
+  width: 70%;
   height: 100%;
-  border: 2px solid $line-grey;
+  background-color: #f0f0f0;
+  overflow: scroll;
+  padding: 10px;
+  box-sizing: border-box;
+}
+.index::-webkit-scrollbar {
+  display: none;
 }

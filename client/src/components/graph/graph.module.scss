@@ -1,0 +1,39 @@
+.index {
+  @include flex-col;
+  height: 100%;
+  width: 30%;
+  overflow: hidden;
+}
+.pic {
+  @include flex-row;
+  align-items: flex-start;
+  justify-content: space-between;
+  position: relative;
+  width: 100%;
+}
+.call {
+  height: 80%;
+}
+.cfg {
+  height: 20%;
+}
+.pic-img {
+  height: calc(100% - 50px);
+  width: 100%;
+  background-image: url("../../assets/test.png");
+  background-size: contain;
+  background-position: center center;
+  background-repeat: no-repeat;
+}
+.pic-icons {
+  @include flex-row;
+  justify-content: space-around;
+  width: 100%;
+  position: absolute;
+  bottom: 5%;
+  img {
+    height: $middle-icon;
+    width: $middle-icon;
+    cursor: pointer;
+  }
+}
