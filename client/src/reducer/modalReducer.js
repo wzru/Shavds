@@ -4,5 +4,7 @@ export default function modalReducer(state, action) {
       return { ...state, visible: true, ...action.data };
     case "close":
       return { ...state, visible: false };
+    default:
+      return state;
   }
 }

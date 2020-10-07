@@ -1,4 +1,35 @@
 .index {
   height: 100%;
-  width: 45%;
+  width: 50%;
+  padding: 10px;
+  box-sizing: border-box;
+}
+.title {
+  font-weight: bolder;
+  font-size: 110%;
+  height: 30px;
+}
+.progress {
+  overflow: scroll;
+  height: calc(100% - 30px);
+}
+.progress::-webkit-scrollbar {
+  display: none;
+}
+.progress-item {
+  @include flex-row;
+  margin: 10px 0;
+}
+.progress-item-name {
+  margin: 0 10px;
+}
+.progress-item-bar {
+  width: 50%;
+  height: 5px;
+  background-color: $border-grey;
+}
+.progress-item-bar-content {
+  background-color: $blue;
+  height: 100%;
+  transition: width 2s;
 }

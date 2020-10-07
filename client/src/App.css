@@ -1,4 +1,6 @@
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   font-size: 90%;
 }
@@ -20,8 +22,10 @@ html, body, #root {
 }
 .right-top {
   display: flex;
-  height: 67%
+  height: 67%;
 }
 .right-bottom {
-  height: 33%
+  display: flex;
+  border-top: 1px solid #f0f0f0;
+  height: 33%;
 }

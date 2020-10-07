@@ -5,6 +5,7 @@ import leftIcon from "../../assets/left.svg";
 import leftIconGR from "../../assets/left-GR.svg";
 import rightIcon from "../../assets/right.svg";
 import rightIconGR from "../../assets/right-GR.svg";
+import { URL } from "../../constants/url";
 
 export default function Graph(props) {
   const { call, cfg } = props;
@@ -25,29 +26,26 @@ export default function Graph(props) {
   return (
     <div className={css["index"]}>
       <div className={`${css["pic"]} ${css["call"]}`}>
-        <div
-          className={css["pic-img"]}
-          style={{ backgroundImage: `url(${call[0]})` }}
-        ></div>
+        {call[0] ? (
+          <div className={css["pic-img"]} style={{ backgroundImage: `url(${URL}/images/${call[0]})` }}></div>
+        ) : (
+          <div>这里还没有图片哦</div>
+        )}
       </div>
       <div className={`${css["pic"]} ${css["cfg"]}`}>
-        <div
-          className={css["pic-img"]}
-          style={{
-            backgroundImage: curIndex === -1 ? "" : `url(${cfg[curIndex]})`,
-          }}
-        ></div>
+        {cfg[0] ? (
+          <div
+            className={css["pic-img"]}
+            style={{
+              backgroundImage: curIndex === -1 ? "" : `url(${URL}/images/${cfg[curIndex]})`,
+            }}
+          ></div>
+        ) : (
+          <div>这里还没有图片哦</div>
+        )}
         <div className={css["pic-icons"]}>
-          <img
-            alt=""
-            src={curIndex === 0 ? leftIconGR : leftIcon}
-            onClick={onLeftClick}
-          />
-          <img
-            alt=""
-            src={curIndex === cfg.length - 1 ? rightIconGR : rightIcon}
-            onClick={onRightClick}
-          />
+          <img alt="" src={curIndex === 0 ? leftIconGR : leftIcon} onClick={onLeftClick} />
+          <img alt="" src={curIndex === cfg.length - 1 ? rightIconGR : rightIcon} onClick={onRightClick} />
         </div>
       </div>
     </div>

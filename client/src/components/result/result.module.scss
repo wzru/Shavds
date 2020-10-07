@@ -1,0 +1,30 @@
+.index {
+  height: 100%;
+  width: 50%;
+  padding: 10px;
+  box-sizing: border-box;
+}
+.title {
+  font-weight: bolder;
+  font-size: 110%;
+  height: 30px;
+}
+.result {
+  overflow: scroll;
+  height: calc(100% - 30px);
+  box-sizing: border-box;
+}
+.result::-webkit-scrollbar {
+  display: none;
+}
+.result-item {
+  @include flex-col;
+  align-items: flex-start;
+  margin: 15px 0;
+}
+.result-item-item {
+  margin: 10px 0;
+  code {
+    font-weight: bolder;
+  }
+}

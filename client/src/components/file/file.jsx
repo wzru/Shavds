@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useReducer } from "react";
+import React, { useState, useEffect } from "react";
 import css from "./file.module.scss";
 import Axios from "../../config/axios";
 import DELETEICON from "../../assets/delete.svg";
@@ -34,6 +34,7 @@ export default function File(props) {
       });
       // 绘图
       Axios.post(`/draw?type=callgraph&file=${name}`).then((callRes) => {
+        console.log(callRes);
         const newGraph = {};
         newGraph.call = callRes.data.data.images;
         Axios.post(`/draw?type=cfg&file=${name}`).then((cfgRes) => {
@@ -109,13 +110,7 @@ export default function File(props) {
       <div className={css["header"]}>
         <div className={css["header-title"]}>资源管理器</div>
         <div className={css["header-icons"]}>
-          <img
-            alt=""
-            className={css["header-icons-item"]}
-            src={DELETEICON}
-            onClick={onDeleteClick}
-            title="删除文件"
-          />
+          <img alt="" className={css["header-icons-item"]} src={DELETEICON} onClick={onDeleteClick} title="删除文件" />
           <div className={css["header-icons-item"]}>
             <img alt="" src={UPICON} />
             <input
@@ -130,9 +125,7 @@ export default function File(props) {
             className={css["header-icons-item"]}
             src={ALLICON}
             onClick={onAllClick}
-            title={
-              multiSelected.length === fileList.length ? "取消全选" : "全选文件"
-            }
+            title={multiSelected.length === fileList.length ? "取消全选" : "全选文件"}
           />
         </div>
       </div>
@@ -149,11 +142,7 @@ export default function File(props) {
                 color: singleSelected === item ? "white" : "",
               }}
             >
-              <img
-                className={css["list-item-icon"]}
-                src={require(`../../assets/${item.split(".")[1]}.svg`)}
-                alt=""
-              />
+              <img className={css["list-item-icon"]} src={require(`../../assets/${item.split(".")[1]}.svg`)} alt="" />
               <div className={css["list-item-name"]}>{item}</div>
               <input
                 readOnly
