@@ -87,14 +87,18 @@ export default function File(props) {
         data: {
           title: "删除文件",
           content: `您确定要删除文件${singleSelected}吗？`,
-          width: '20%',
-          height: '20%',
-          top: '40%',
-          left: '40%',
+          width: "20%",
+          height: "20%",
+          top: "40%",
+          left: "40%",
           hideCancel: false,
           onConfirm: () => {
             dispatchModal({ type: "close" });
-            Axios.delete(`/file/${singleSelected}`).then(() => getFileList());
+            Axios.delete(`/file/${singleSelected}`).then(() => {
+              getFileList();
+              setSingleSelected("");
+              setMultiSelected([]);
+            });
           },
         },
       });

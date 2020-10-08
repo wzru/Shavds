@@ -7,13 +7,18 @@ export default function Progress(props) {
   return (
     <div className={css["index"]}>
       <div className={css["title"]}>
-        总进度 {curTab === BUG ? `${num}/${num}` : `${Object.keys(progress).filter((filenames) => progress[filenames] === 1).length}/${num * (num - 1) * 0.5}`}
+        总进度{" "}
+        {curTab === BUG
+          ? `${num}/${num}`
+          : `${Object.keys(progress).filter((filenames) => progress[filenames] === 1).length}/${num * (num - 1) * 0.5}`}
       </div>
       <div className={css["progress"]}>
         {Object.keys(progress).map((filenames) => {
           return (
             <div key={filenames} className={css["progress-item"]}>
-              <div className={css["progress-item-name"]}>{filenames}</div>
+              <div className={css["progress-item-name"]}>{`${filenames.split("&")[0]}${
+                filenames.split("&").length > 1 ? `和${filenames.split("&")[1]}` : ""
+              }`}</div>
               <div className={css["progress-item-bar"]}>
                 <div
                   className={css["progress-item-bar-content"]}

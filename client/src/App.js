@@ -13,9 +13,8 @@ import updateObjReducer from "./reducer/updateObjReducer";
 
 function App() {
   const [modalState, dispatchModal] = useReducer(modalReducer, {});
-  const [progressState, dispatchProgress] = useReducer(updateObjReducer, { "file1&file2": 0.5 });
-  const [bugState, dispatchBug] = useReducer(updateObjReducer, {});
-  const [resultState, dispatchResult] = useReducer(updateObjReducer, { "file1&file2": [] });
+  const [progressState, dispatchProgress] = useReducer(updateObjReducer, {});
+  const [resultState, dispatchResult] = useReducer(updateObjReducer, {});
   const [singleSelected, setSingleSelected] = useState("");
   const [multiSelected, setMultiSelected] = useState([]);
   const [code, setCode] = useState("");
@@ -33,6 +32,7 @@ function App() {
           setCurTab={setCurTab}
           multiSelected={multiSelected}
           dispatchProgress={dispatchProgress}
+          result={resultState}
           dispatchResult={dispatchResult}
         />
         <File
@@ -51,11 +51,17 @@ function App() {
       <div className="right">
         <div className="right-top">
           <Code code={code} name={singleSelected} />
-          <Graph {...graph} />
+          <Graph {...graph} dispatchModal={dispatchModal} />
         </div>
         <div className="right-bottom">
           <Progress progress={progressState} num={multiSelected.length} curTab={curTab} />
-          <Result result={resultState} dispatchModal={dispatchModal} curTab={curTab} setSingleSelected={setSingleSelected} setCode={setCode} />
+          <Result
+            result={resultState}
+            dispatchModal={dispatchModal}
+            curTab={curTab}
+            setSingleSelected={setSingleSelected}
+            setCode={setCode}
+          />
         </div>
       </div>
     </div>

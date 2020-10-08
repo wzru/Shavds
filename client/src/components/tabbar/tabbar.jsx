@@ -7,19 +7,19 @@ import COPYICON from "../../assets/copy.svg";
 import COPYICONB from "../../assets/copy-B.svg";
 import ROCKETICON from "../../assets/rocket.svg";
 import ROCKETICONO from "../../assets/rocket-O.svg";
+import EXPORTICON from "../../assets/daochu.svg";
 import EXPORTICONG from "../../assets/daochu-G.svg";
 import BUGICON from "../../assets/bug.svg";
 import BUGICONR from "../../assets/bug-R.svg";
 
 function Tabbar(props) {
-  const { curTab, setCurTab, multiSelected, dispatchProgress, dispatchResult, dispatchBug } = props;
+  const { curTab, setCurTab, multiSelected, dispatchProgress, result, dispatchResult } = props;
   // 传入两个文件名并返回一个新对象
   const getObjByNames = (file1, file2, data) => {
     const newObj = {};
     newObj[`${file1}&${file2}`] = data;
     return newObj;
   };
-
   // 点击运行按钮
   const onRunClick = () => {
     dispatchProgress({ type: "empty" });
@@ -53,17 +53,21 @@ function Tabbar(props) {
     }
     // 如果是漏洞检测
     else if (multiSelected.length && curTab === BUG) {
-      multiSelected.map(file => {
+      multiSelected.map((file) => {
         dispatchProgress({ type: "add", data: { [file]: 0 } });
         setTimeout(() => {
           dispatchProgress({ type: "add", data: { [file]: 1 } });
         }, 200);
-        Axios.get(`/detect?file=${file}`).then(res => {
-          console.log(res)
+        Axios.get(`/detect?file=${file}`).then((res) => {
+          console.log(res);
           dispatchResult({ type: "add", data: { [file]: res.data.data } });
-        })
-      })
+        });
+      });
     }
+  };
+  // 点击导出按钮
+  const onExportClick = () => {
+    console.log(result);
   };
   return (
     <div className={css["index"]}>
@@ -90,8 +94,8 @@ function Tabbar(props) {
         />
         <div>运行</div>
       </div>
-      <div className={css["button"]}>
-        <img className="exporticon" alt="" src={EXPORTICONG} />
+      <div className={css["button"]} onClick={onExportClick}>
+        <img className="exporticon" alt="" src={result ? EXPORTICONG : EXPORTICON} />
         <div>导出结果</div>
       </div>
     </div>

@@ -8,7 +8,7 @@ import rightIconGR from "../../assets/right-GR.svg";
 import { URL } from "../../constants/url";
 
 export default function Graph(props) {
-  const { call, cfg } = props;
+  const { call, cfg, dispatchModal } = props;
   const [curIndex, setCurIndex] = useState(0);
   useEffect(() => {
     setCurIndex(0);
@@ -23,13 +23,41 @@ export default function Graph(props) {
       setCurIndex(curIndex - 1);
     }
   };
+  const onImageClick = () => {
+    dispatchModal({
+      type: "open",
+      data: {
+        title: "查看图片",
+        top: "10%",
+        left: "10%",
+        height: "80%",
+        width: "80%",
+        content: (
+          <div
+            style={{
+              backgroundImage: curIndex === -1 ? "" : `url(${URL}/images/${cfg[curIndex]})`,
+              backgroundSize: "contain",
+              backgroundPosition: "center center",
+              backgroundRepeat: "no-repeat",
+              height: "100%",
+              width: "100%",
+            }}
+          ></div>
+        ),
+        hideCancel: true,
+        onConfirm: () => {
+          dispatchModal({ type: "close" });
+        },
+      },
+    });
+  };
   return (
     <div className={css["index"]}>
       <div className={`${css["pic"]} ${css["call"]}`}>
         {call[0] ? (
           <div className={css["pic-img"]} style={{ backgroundImage: `url(${URL}/images/${call[0]})` }}></div>
         ) : (
-          <div>这里还没有图片哦</div>
+          <div>Call Graph</div>
         )}
       </div>
       <div className={`${css["pic"]} ${css["cfg"]}`}>
@@ -39,9 +67,10 @@ export default function Graph(props) {
             style={{
               backgroundImage: curIndex === -1 ? "" : `url(${URL}/images/${cfg[curIndex]})`,
             }}
+            onClick={onImageClick}
           ></div>
         ) : (
-          <div>这里还没有图片哦</div>
+          <div>CFG</div>
         )}
         <div className={css["pic-icons"]}>
           <img alt="" src={curIndex === 0 ? leftIconGR : leftIcon} onClick={onLeftClick} />
