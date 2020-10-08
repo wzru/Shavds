@@ -1,10 +1,10 @@
 import * as XLSX from "xlsx";
 
 export default function writeWorkbookToLocalFile(jsonArr, sheetName, mapType) {
-  let newjsonArr = jsonArr.map((oldJson) => {
-    let newJson = {};
-    for (let key in oldJson) {
-      let newKey = key in HEADER_MAP ? HEADER_MAP[key] : key;
+  const newjsonArr = jsonArr.map((oldJson) => {
+    const newJson = {};
+    for (const key in oldJson) {
+      const newKey = mapType[key];
       newJson[newKey] = oldJson[key];
     }
     console.log(newJson);

@@ -13,16 +13,19 @@ export default function Graph(props) {
   useEffect(() => {
     setCurIndex(0);
   }, [call, cfg]);
+  // 下一张图
   const onRightClick = () => {
     if (curIndex !== cfg.length - 1) {
       setCurIndex(curIndex + 1);
     }
   };
+  // 上一张图
   const onLeftClick = () => {
     if (curIndex !== 0) {
       setCurIndex(curIndex - 1);
     }
   };
+  // 点击放大查看图片
   const onImageClick = () => {
     dispatchModal({
       type: "open",

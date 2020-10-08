@@ -1,7 +1,9 @@
 import React from "react";
 import css from "./tabbar.module.scss";
 import { BUG, CFG, FUN } from "../../constants/pages";
+import { BUGMAP, CMPMAP } from "../../constants/map";
 import Axios from "../../config/axios";
+import writeWorkbookToLocalFile from "../../utils/writeFile";
 
 import COPYICON from "../../assets/copy.svg";
 import COPYICONB from "../../assets/copy-B.svg";
@@ -67,7 +69,17 @@ function Tabbar(props) {
   };
   // 点击导出按钮
   const onExportClick = () => {
-    console.log(result);
+    const dataArr = [];
+    for (const key in result) {
+      result[key].map((obj) => {
+        dataArr.push(obj);
+      });
+    }
+    console.log(dataArr);
+    if (curTab === BUG) {
+      writeWorkbookToLocalFile(dataArr, curTab, BUGMAP);
+    }
+    writeWorkbookToLocalFile(dataArr, curTab, curTab === BUG ? BUGMAP : CMPMAP);
   };
   return (
     <div className={css["index"]}>

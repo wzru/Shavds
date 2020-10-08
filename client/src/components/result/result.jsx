@@ -6,19 +6,24 @@ import css from "./result.module.scss";
 
 export default function Result(props) {
   const { result, dispatchModal, curTab, setSingleSelected, setCode } = props;
+  // 点击查看结果
   const onResultClick = (e) => {
     const { name } = e.currentTarget.dataset;
     // 如果是漏洞检测
     if (curTab === BUG) {
+      // 单选文件
       setSingleSelected(name);
       Axios.get(`/file/${name}`).then((res) => {
         setCode(res.data);
+        // 设置正常代码为绿色
         const allLines = document.querySelectorAll(".pre-line-norm");
         for (let i = 0; i < allLines.length; ++i) {
           allLines[i].style.display = "block";
         }
+        // 将有漏洞的代码设置为红色
         result[name].map((bug) => {
           const bugMark = document.getElementsByClassName(`${name}-${bug.line}`)[0];
+          // 去掉漏洞代码的绿色
           allLines[bug.line - 1].style.display = "none";
           if (bugMark.className.indexOf("bug") === -1) {
             bugMark.style.display = "flex";
