@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -63,7 +62,7 @@ func cors() gin.HandlerFunc {
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "OPTIONS, GET, POST, DELETE")
-		c.Writer.Header().Set("Content-Type", "application/json; charset=utf-8")
+		c.Writer.Header().Set("Content-Type", "*; charset=utf-8")
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
 			return
@@ -97,6 +96,7 @@ func draw(c *gin.Context) {
 	cmd1 := exec.Command("./core/gen.sh", "-O0", "-g", dir+file)
 	fmt.Println(cmd1.String())
 	out1, _ := cmd1.Output()
+	fmt.Printf("out1=%v\n", string(out1))
 	reg := regexp.MustCompile(`successfully generated \'(?s:(.*?))\'`)
 	res := (reg.FindAllStringSubmatch(string(out1), -1))
 	ll := ""
@@ -104,16 +104,19 @@ func draw(c *gin.Context) {
 		ll = text[1]
 	}
 	cmd2 := exec.Command("./core/draw.sh", "-T", tp, ll)
-	fmt.Println(cmd2.String())
+	fmt.Printf("cmd2=%v\n", cmd2.String())
 	out2, _ := cmd2.Output()
 	res = reg.FindAllStringSubmatch(string(out2), -1)
 	imgs := []string{}
 	// fmt.Printf("res=%v\n", res)
 	for _, text := range res {
-		// fmt.Printf("text=%v\n", text)
-		imgs = append(imgs, filepath.Base(text[1]))
+		// image, _ := ioutil.ReadFile(text[1])
+		url := text[1][len(dataDir):]
+		// fmt.Printf("url=%v\n", url)
+		imgs = append(imgs, url)
+		// imgs = append(imgs, "data:image/png;base64,"+base64.StdEncoding.EncodeToString(image))
 	}
-	fmt.Printf("imgs=%v\n", imgs)
+	// fmt.Printf("imgs=%v\n", imgs)
 	// c.File(img)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -136,6 +139,7 @@ func cmpfun(c *gin.Context) {
 	fmt.Println(cmd1.String())
 	out1, _ := cmd1.Output()
 	res := cllReg.FindStringSubmatch(string(out1))
+	fmt.Printf("out1=%v\n", string(out1))
 	ll := res[1]
 	// fmt.Printf("ll=%v\n", ll)
 	cmd2 := exec.Command("./core/shavds.sh", "cmpfun", ll)
@@ -200,10 +204,10 @@ func cmpcfg(c *gin.Context) {
 	cmd1 := exec.Command("./core/gen.sh", "-O3", "-g", file1, file2)
 	fmt.Println(cmd1.String())
 	out1, _ := cmd1.Output()
-	// fmt.Printf("out1=%v\n", string(out1))
+	fmt.Printf("out1=%v\n", string(out1))
 	// fmt.Printf("out1=%v\n", out1)
 	res := cllReg.FindStringSubmatch(string(out1))
-	// fmt.Printf("res[%d]=%v\n", len(res), res)
+	fmt.Printf("res[%d]=%v\n", len(res), res)
 	ll := res[1]
 	// fmt.Printf("ll=%v\nreg=%v\n", ll, cllReg.String())
 	// fmt.Printf("reg=%v\n", reg.String())
@@ -351,6 +355,12 @@ func getFile(c *gin.Context) {
 	c.File(file)
 }
 
+func getImage(c *gin.Context) {
+	file := dataDir + c.Param("token") + "/" + c.Param("ran") + "/" + c.Param("file")
+	fmt.Printf("file=%v\n", file)
+	c.File(file)
+}
+
 func delFile(c *gin.Context) {
 	auth := strings.Fields(c.Request.Header.Get("Authorization"))[1]
 	clm, _ := parseToken(auth)
@@ -431,6 +441,7 @@ func detect(c *gin.Context) {
 				continue
 			}
 			res := strings.Split(line, " ")
+			fmt.Printf("detect res=%v\n", res)
 			line, _ := strconv.Atoi(res[1])
 			col, _ := strconv.Atoi(res[2])
 			vulRes := vulRes{
@@ -454,6 +465,7 @@ func main() {
 	r.Use(cors())
 	r.GET("/ping", pong)
 	r.POST("/upload", upload)
+	r.GET("/images/:token/:ran/:file", getImage)
 	g := r.Group("/")
 	g.Use(authJWT())
 	{

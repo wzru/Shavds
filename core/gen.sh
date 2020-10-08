@@ -6,6 +6,8 @@ BLUE='\e[1;44m'  # 蓝
 PINK='\e[1;45m'  # 粉红
 RES='\e[0m'  # 清除颜色
 
+ran=$(cat /proc/sys/kernel/random/uuid | md5sum | cut -c 1-17)
+
 if [ $# -ge 2 ]
 then
     optm=-O3
@@ -32,28 +34,36 @@ then
     #通过shift $(($OPTIND - 1))的处理，$*中就只保留了除去选项内容的参数，可以在后面的shell程序中进行处理
     shift $(($OPTIND - 1))
     lls=()
+    bases=()
     for file in $@
     do
         echo "processing '${file}'..."
-        clang++ $file $optm $dbg $f -S -emit-llvm -o ${file%.*}.ll
+        dir=$(dirname ${file})/$ran
+        base=$(basename ${file})
+        base=${base%.*}
+        # echo base=$base
+        mkdir -p $dir
+        clang++ $file $optm $dbg $f -S -emit-llvm -o ${dir}/${base}.ll
         # echo "clang++ $file $optm $dbg $f -S -emit-llvm -o ${file%.*}.ll"
         if [ $? -ne 0 ]
         then
             echo -e "${RED}failed${RES} to process '${file}'"
             exit 1
         fi
-        opt -load core/shavds.so -obfuscate < ${file%.*}.ll > ${file%.*}.bc
-        llvm-dis ${file%.*}.bc -o ${file%.*}-obfuscate.ll
-        rm ${file%.*}.bc
+        opt -load core/shavds.so -obfuscate < ${dir}/${base}.ll > ${dir}/${base}.bc
+        llvm-dis ${dir}/${base}.bc -o ${dir}/${base}-obfuscate.ll
+        rm ${dir}/${base}.bc
         if [ $? -eq 0 ]
         then
-            echo -e "successfully generated '${file%.*}.ll'"
+            echo -e "successfully generated '${dir}/${base}.ll'"
         fi
-        lls+=(${file%.*}-obfuscate.ll)
+        bases+=${base}
+        lls+=(${dir}/${base}-obfuscate.ll)
     done
+    # echo "bases=${bases[*]}"
     if [ ${#lls[*]} -ge 2 ]
     then
-        merge="$(dirname $file)/merge.ll"
+        merge="${dir}/${bases[*]}.ll"
         llvm-link ${lls[*]} -S -o $merge
         if [ $? -eq 0 ]
         then
@@ -63,7 +73,8 @@ then
     # 删除obfuscate文件
     for file in $@
     do
-        rm ${file%.*}-obfuscate.ll
+        base=$(basename $file)
+        rm ${dir}/${base%.*}-obfuscate.ll
     done
 
 else
