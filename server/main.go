@@ -50,6 +50,7 @@ type vulRes struct {
 	Type string `json:"type"`
 	Line int    `json:"line"`
 	Col  int    `json:"column"`
+	File string `json:"file"`
 }
 
 func cors() gin.HandlerFunc {
@@ -441,12 +442,13 @@ func detect(c *gin.Context) {
 	reader := bufio.NewReader(stderr)
 	for {
 		line, err := reader.ReadString('\n')
-		// fmt.Printf("line=%v\n", line)
+		fmt.Printf("line=%v\n", line)
 		if err != nil || io.EOF == err {
+			fmt.Printf("err=%v\n", err)
 			break
 		}
 		if len(line) == 0 {
-			continue
+			break
 		}
 		res := strings.Split(line, " ")
 		if len(res) < 3 {
@@ -459,8 +461,10 @@ func detect(c *gin.Context) {
 			Type: res[0],
 			Line: lin,
 			Col:  col,
+			File: c.Query("file"),
 		}
 		data = append(data, vulRes)
+		// time.Sleep(100)
 	}
 	cmd2.Wait()
 	c.JSON(http.StatusOK, gin.H{
