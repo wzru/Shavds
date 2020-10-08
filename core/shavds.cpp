@@ -401,9 +401,10 @@ struct Detector : public ModulePass
     Value*                         logFunc;
     Type*                          VoidTy;
     Type*                          Int32Ty;
-    const std::vector<std::string> VulFuncNames{"strcpy",  "strcpy",   "strncpy", "memcpy",  "strcat", "strncat",
-                                                "sprintf", "vsprintf", "gets",    "getchar", "fgetc",  "getc",
-                                                "read",    "sscanf",   "fscanf",  "vfscanf", "vscanf", "vsscanf"};
+    const std::vector<std::string> BufVulFuncNames{"strcpy", "strcpy",  "strncpy", "memcpy", "strcat", "strncat",
+                                                   "gets",   "getchar", "fgetc",   "getc",   "read"};
+    const std::vector<std::string> FmtVulFuncNames{"sprintf", "vsprintf", "sscanf", "fscanf",
+                                                   "vfscanf", "vscanf",   "vsscanf"};
     Detector() : ModulePass(ID) {}
     void init(Module& M)
     {
@@ -414,7 +415,7 @@ struct Detector : public ModulePass
     }
     bool isBufVul(const std::string& name)  //缓冲区溢出漏洞
     {
-        for (auto i : VulFuncNames) {
+        for (auto i : BufVulFuncNames) {
             if (i == name) return true;
         }
         return false;
@@ -435,6 +436,13 @@ struct Detector : public ModulePass
     {
         return name.find("__ubsan_handle_type_mismatch") != std::string::npos;
     }
+    bool isFmtStrVul(const std::string& name)  //空指针漏洞
+    {
+        for (auto i : FmtVulFuncNames) {
+            if (i == name) return true;
+        }
+        return false;
+    }
     void findOperand(Value* itVal)
     {
         std::stack<Value*> st;
@@ -442,7 +450,6 @@ struct Detector : public ModulePass
         while (!st.empty()) {
             auto ele = st.top();
             st.pop();
-
             if (isa<Instruction>(ele)) {
                 Instruction* tip = (Instruction*)ele;
                 if (isa<AllocaInst>(tip)) {
@@ -532,6 +539,10 @@ struct Detector : public ModulePass
                         }
                         if (isPtrNullVul(op->get()->getName())) {
                             errs() << "pointer-null " << I.getDebugLoc().getLine() << " " << I.getDebugLoc().getCol()
+                                   << "\n";
+                        }
+                        if (isFmtStrVul(op->get()->getName())) {
+                            errs() << "format-string " << I.getDebugLoc().getLine() << " " << I.getDebugLoc().getCol()
                                    << "\n";
                         }
                     }

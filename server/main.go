@@ -406,11 +406,19 @@ func getList(c *gin.Context) {
 			files = append(files, file.Name())
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data": gin.H{
-			"list": files,
-		}})
+	if len(files) > 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"data": gin.H{
+				"list": files,
+			}})
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"data": gin.H{
+				"list": make([]interface{}, 0),
+			}})
+	}
 }
 
 func detect(c *gin.Context) {
@@ -426,31 +434,33 @@ func detect(c *gin.Context) {
 	ll := res[1]
 	// fmt.Printf("res=%v\n", res)
 	cmd2 := exec.Command("./core/shavds.sh", "detect", ll)
-	buf := make([]byte, 1024)
 	data := []vulRes{}
+	// buf := make([]byte, 2048)
 	stderr, _ := cmd2.StderrPipe()
 	cmd2.Start()
 	reader := bufio.NewReader(stderr)
 	for {
-		cnt, err := reader.Read(buf)
+		line, err := reader.ReadString('\n')
+		// fmt.Printf("line=%v\n", line)
 		if err != nil || io.EOF == err {
 			break
 		}
-		for _, line := range strings.Split(string(buf[0:cnt]), "\n") {
-			if len(line) == 0 {
-				continue
-			}
-			res := strings.Split(line, " ")
-			fmt.Printf("detect res=%v\n", res)
-			line, _ := strconv.Atoi(res[1])
-			col, _ := strconv.Atoi(res[2])
-			vulRes := vulRes{
-				Type: res[0],
-				Line: line,
-				Col:  col,
-			}
-			data = append(data, vulRes)
+		if len(line) == 0 {
+			continue
 		}
+		res := strings.Split(line, " ")
+		if len(res) < 3 {
+			continue
+		}
+		fmt.Printf("detect res=%v\n", res)
+		lin, _ := strconv.Atoi(res[1])
+		col, _ := strconv.Atoi(res[2])
+		vulRes := vulRes{
+			Type: res[0],
+			Line: lin,
+			Col:  col,
+		}
+		data = append(data, vulRes)
 	}
 	cmd2.Wait()
 	c.JSON(http.StatusOK, gin.H{
