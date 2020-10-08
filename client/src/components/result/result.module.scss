@@ -20,11 +20,15 @@
 .result-item {
   @include flex-col;
   align-items: flex-start;
-  margin: 15px 0;
+  margin: 10px 0;
+  cursor: pointer;
 }
 .result-item-item {
   margin: 10px 0;
   code {
     font-weight: bolder;
   }
+}
+:global(.bug) {
+  background-color: red;
 }

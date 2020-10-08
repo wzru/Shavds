@@ -27,13 +27,18 @@
   box-sizing: border-box;
 }
 .content {
-  @include flex-row;
+  @include flex-col;
   justify-content: center;
   height: calc(100% - 90px);
   font-size: 110%;
+  overflow: scroll;
+}
+.content::-webkit-scrollbar {
+  display: none;
 }
 .bottom {
   @include flex-row;
+  justify-content: center;
   height: 50px;
   border-top: 1px solid $border-grey;
   cursor: pointer;

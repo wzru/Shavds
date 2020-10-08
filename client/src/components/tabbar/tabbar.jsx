@@ -12,7 +12,7 @@ import BUGICON from "../../assets/bug.svg";
 import BUGICONR from "../../assets/bug-R.svg";
 
 function Tabbar(props) {
-  const { curTab, setCurTab, multiSelected, singleSelected, dispatchProgress, dispatchResult } = props;
+  const { curTab, setCurTab, multiSelected, dispatchProgress, dispatchResult, dispatchBug } = props;
   // 传入两个文件名并返回一个新对象
   const getObjByNames = (file1, file2, data) => {
     const newObj = {};
@@ -24,8 +24,8 @@ function Tabbar(props) {
   const onRunClick = () => {
     dispatchProgress({ type: "empty" });
     dispatchResult({ type: "empty" });
-    // 如果选择了多个文件
-    if (multiSelected.length && multiSelected.length !== 1 && curTab !== BUG) {
+    // 如果是同源性检测
+    if (multiSelected.length > 1 && curTab !== BUG) {
       const type = curTab === CFG ? "cmpcfg" : "cmpfun";
       for (let i = 0; i < multiSelected.length; ++i) {
         for (let j = i + 1; j < multiSelected.length; ++j) {
@@ -39,7 +39,7 @@ function Tabbar(props) {
             Axios.get(`/progress?file1=${file1}&file2=${file2}`).then((res) => {
               dispatchProgress({ type: "add", data: getObjByNames(file1, file2, res.data.data) });
             });
-          }, 100);
+          }, 300);
           Axios.get(`/${type}?file1=${file1}&file2=${file2}`).then((res) => {
             // 传递查询结果
             dispatchResult({ type: "add", data: getObjByNames(file1, file2, res.data.data) });
@@ -50,6 +50,19 @@ function Tabbar(props) {
           });
         }
       }
+    }
+    // 如果是漏洞检测
+    else if (multiSelected.length && curTab === BUG) {
+      multiSelected.map(file => {
+        dispatchProgress({ type: "add", data: { [file]: 0 } });
+        setTimeout(() => {
+          dispatchProgress({ type: "add", data: { [file]: 1 } });
+        }, 200);
+        Axios.get(`/detect?file=${file}`).then(res => {
+          console.log(res)
+          dispatchResult({ type: "add", data: { [file]: res.data.data } });
+        })
+      })
     }
   };
   return (
@@ -70,7 +83,7 @@ function Tabbar(props) {
         <img
           alt=""
           src={
-            (singleSelected && curTab === BUG) || (multiSelected.length && multiSelected.length !== 1 && curTab !== BUG)
+            (multiSelected.length && curTab === BUG) || (multiSelected.length > 1 && curTab !== BUG)
               ? ROCKETICONO
               : ROCKETICON
           }

@@ -1,4 +1,4 @@
-export default function resultReducer(state, action) {
+export default function updateObjReducer(state, action) {
   switch (action.type) {
     case "empty":
       return {};

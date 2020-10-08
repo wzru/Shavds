@@ -26,6 +26,7 @@ export default function File(props) {
     if (singleSelected === name) {
       setSingleSelected("");
       setCode("");
+      setGraph({ call: [], cfg: [] });
     } else {
       setSingleSelected(name);
       // 获取文件内容
@@ -34,7 +35,6 @@ export default function File(props) {
       });
       // 绘图
       Axios.post(`/draw?type=callgraph&file=${name}`).then((callRes) => {
-        console.log(callRes);
         const newGraph = {};
         newGraph.call = callRes.data.data.images;
         Axios.post(`/draw?type=cfg&file=${name}`).then((cfgRes) => {
@@ -67,13 +67,11 @@ export default function File(props) {
   };
   // 选择文件并上传
   const onSelectFile = (e) => {
-    console.log(e.target.files);
     const { files } = e.target;
     const formData = new FormData();
     for (let i = 0; i < files.length; ++i) {
       formData.append("files", files[i]);
     }
-    console.log(formData.getAll("files"));
     Axios.post("/upload", formData, {
       headers: { "Content-Type": "multipart/form-data" },
     }).then((uploadRes) => {
@@ -89,6 +87,11 @@ export default function File(props) {
         data: {
           title: "删除文件",
           content: `您确定要删除文件${singleSelected}吗？`,
+          width: '20%',
+          height: '20%',
+          top: '40%',
+          left: '40%',
+          hideCancel: false,
           onConfirm: () => {
             dispatchModal({ type: "close" });
             Axios.delete(`/file/${singleSelected}`).then(() => getFileList());

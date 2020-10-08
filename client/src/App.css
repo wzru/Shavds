@@ -3,9 +3,9 @@ body,
 #root {
   height: 100%;
   font-size: 90%;
+  box-sizing: border-box;
 }
 .App {
-  /* text-align: center; */
   display: flex;
   flex-direction: row;
   justify-content: space-evenly;

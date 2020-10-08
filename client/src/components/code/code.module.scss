@@ -9,3 +9,17 @@
 .index::-webkit-scrollbar {
   display: none;
 }
+.pre-line {
+  @include flex-row;
+  position: relative;
+}
+.pre-line-bg {
+  @include flex-row;
+  justify-content: flex-end;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-color: rgba($color: #ff2e2e, $alpha: 0.3);
+  display: none;
+  font-weight: bold;
+}

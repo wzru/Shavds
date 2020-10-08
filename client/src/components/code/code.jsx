@@ -13,7 +13,15 @@ export default function Code(props) {
   return (
     <div className={css["index"]}>
       <pre className={css["pre"]}>
-        <code className={name.split(".")[1]}>{code ? code : "Hello World!"}</code>
+        {code ? code.split('\n').map((line, index) => {
+          return (
+            <div key={index + line} className={css['pre-line']}>
+              <div className={`${css['pre-line-bg']} ${name}-${index + 1}`}></div>
+              <code>{index + 1}</code>
+              <code className={name.split(".")[1]}>{line}</code>
+            </div>
+          )
+        }) : <code>'Hello World'</code>}
       </pre>
     </div>
   );
