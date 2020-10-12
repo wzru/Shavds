@@ -133,6 +133,14 @@ struct CmpRes
     }
 };
 
+struct DetRes
+{
+    u32         line, col;
+    std::string type;
+    DetRes() = default;
+    DetRes(u32 l, u32 c, const std::string& s) : line(l), col(c), type(s) {}
+};
+
 namespace {
 struct Hello : public FunctionPass
 {
@@ -403,8 +411,9 @@ struct Detector : public ModulePass
     Type*                          Int32Ty;
     const std::vector<std::string> BufVulFuncNames{"strcpy", "strcpy",  "strncpy", "memcpy", "strcat", "strncat",
                                                    "gets",   "getchar", "fgetc",   "getc",   "read"};
-    const std::vector<std::string> FmtVulFuncNames{"sprintf", "vsprintf", "sscanf", "fscanf",
-                                                   "vfscanf", "vscanf",   "vsscanf"};
+    const std::vector<std::string> FmtVulFuncNames{"sprintf",        "vsprintf",        "sscanf",  "fscanf",
+                                                   "vfscanf",        "vscanf",          "vsscanf", "__isoc99_sscanf",
+                                                   "__isoc99_scanf", "__isoc99_sprintf", "__isoc99_printf"};
     Detector() : ModulePass(ID) {}
     void init(Module& M)
     {
@@ -515,41 +524,71 @@ struct Detector : public ModulePass
     }
     bool runOnModule(Module& M)
     {
-        bool res = false;
+        bool                res = false;
+        std::vector<DetRes> vdr;
         // init(M);
         for (Function& F : M) {
             for (BasicBlock& B : F) {
                 for (Instruction& I : B) {
                     for (auto op = I.op_begin(); op != I.op_end(); ++op) {
-                        if (isBufVul(op->get()->getName())) {
-                            errs() << "buffer-overflow " << I.getDebugLoc().getLine() << " " << I.getDebugLoc().getCol()
-                                   << "\n";
-                        }
                         if (isIntWidthVul(op->get()->getName())) {
-                            errs() << "integer-width-overflow " << I.getDebugLoc().getLine() << " "
-                                   << I.getDebugLoc().getCol() << "\n";
+                            vdr.push_back(
+                                DetRes(I.getDebugLoc().getLine(), I.getDebugLoc().getCol(), "integer-width-overflow"));
                         }
                         if (isIntOpVul(op->get()->getName())) {
-                            errs() << "integer-operate-overflow " << I.getDebugLoc().getLine() << " "
-                                   << I.getDebugLoc().getCol() << "\n";
+                            vdr.push_back(DetRes(I.getDebugLoc().getLine(), I.getDebugLoc().getCol(),
+                                                 "integer-operate-overflow"));
                         }
                         if (isIntSgnVul(op->get()->getName())) {
-                            errs() << "integer-sign-overflow " << I.getDebugLoc().getLine() << " "
-                                   << I.getDebugLoc().getCol() << "\n";
+                            vdr.push_back(
+                                DetRes(I.getDebugLoc().getLine(), I.getDebugLoc().getCol(), "integer-sign-overflow"));
                         }
                         if (isPtrNullVul(op->get()->getName())) {
-                            errs() << "pointer-null " << I.getDebugLoc().getLine() << " " << I.getDebugLoc().getCol()
-                                   << "\n";
+                            vdr.push_back(DetRes(I.getDebugLoc().getLine(), I.getDebugLoc().getCol(), "pointer-null"));
                         }
                         if (isFmtStrVul(op->get()->getName())) {
-                            errs() << "format-string " << I.getDebugLoc().getLine() << " " << I.getDebugLoc().getCol()
-                                   << "\n";
+                            vdr.push_back(DetRes(I.getDebugLoc().getLine(), I.getDebugLoc().getCol(), "format-string"));
                         }
+                        if (isBufVul(op->get()->getName())) {
+                            vdr.push_back(
+                                DetRes(I.getDebugLoc().getLine(), I.getDebugLoc().getCol(), "buffer-overflow"));
+                        }
+                        // if (isBufVul(op->get()->getName())) {
+                        //     errs() << "buffer-overflow        " << I.getDebugLoc().getLine() << " "
+                        //            << I.getDebugLoc().getCol() << "\n";
+                        // }
+                        // if (isIntWidthVul(op->get()->getName())) {
+                        //     errs() << "integer-width-overflow " << I.getDebugLoc().getLine() << " "
+                        //            << I.getDebugLoc().getCol() << "\n";
+                        // }
+                        // if (isIntOpVul(op->get()->getName())) {
+                        //     errs() << "integer-operate-overflow " << I.getDebugLoc().getLine() << " "
+                        //            << I.getDebugLoc().getCol() << "\n";
+                        // }
+                        // if (isIntSgnVul(op->get()->getName())) {
+                        //     errs() << "integer-sign-overflow " << I.getDebugLoc().getLine() << " "
+                        //            << I.getDebugLoc().getCol() << "\n";
+                        // }
+                        // if (isPtrNullVul(op->get()->getName())) {
+                        //     errs() << "pointer-null          " << I.getDebugLoc().getLine() << " "
+                        //            << I.getDebugLoc().getCol() << "\n";
+                        // }
+                        // if (isFmtStrVul(op->get()->getName())) {
+                        //     errs() << "format-string " << I.getDebugLoc().getLine() << " " <<
+                        //     I.getDebugLoc().getCol()
+                        //            << "\n";
+                        // }
                     }
                 }
             }
         }
-        return false;
+        char buf[65536];
+        memset(buf, 0, sizeof(buf));
+        for (int i = 0; i < vdr.size(); ++i) {
+            sprintf(buf, "%s %d %d\n", vdr[i].type.c_str(), vdr[i].line, vdr[i].col);
+        }
+        fputs(buf, stderr);
+        return 0;
     }
 };
 
