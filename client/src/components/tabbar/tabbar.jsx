@@ -6,13 +6,15 @@ import Axios from "../../config/axios";
 import writeWorkbookToLocalFile from "../../utils/writeFile";
 
 import COPYICON from "../../assets/copy.svg";
-import COPYICONB from "../../assets/copy-B.svg";
+import COPYICONDB from "../../assets/copy-DB.svg";
+import COPYICONLB from "../../assets/copy-LB.svg";
 import ROCKETICON from "../../assets/rocket.svg";
 import ROCKETICONO from "../../assets/rocket-O.svg";
 import EXPORTICON from "../../assets/daochu.svg";
 import EXPORTICONG from "../../assets/daochu-G.svg";
 import BUGICON from "../../assets/bug.svg";
 import BUGICONR from "../../assets/bug-R.svg";
+import GITHUBICON from "../../assets/github.svg";
 
 function Tabbar(props) {
   const { curTab, setCurTab, multiSelected, dispatchProgress, result, dispatchResult } = props;
@@ -83,13 +85,13 @@ function Tabbar(props) {
   };
   return (
     <div className={css["index"]}>
-      <div className={css["button"]} onClick={() => setCurTab(CFG)}>
-        <img alt="" src={curTab === CFG ? COPYICONB : COPYICON} />
-        <div style={{ whiteSpace: "pre" }}>{"同源性检测\n(基于CFG)"}</div>
-      </div>
       <div className={css["button"]} onClick={() => setCurTab(FUN)}>
-        <img alt="" src={curTab === FUN ? COPYICONB : COPYICON} />
+        <img alt="" src={curTab === FUN ? COPYICONLB : COPYICON} />
         <div style={{ whiteSpace: "pre" }}>{"同源性检测\n(基于字符串)"}</div>
+      </div>
+      <div className={css["button"]} onClick={() => setCurTab(CFG)}>
+        <img alt="" src={curTab === CFG ? COPYICONDB : COPYICON} />
+        <div style={{ whiteSpace: "pre" }}>{"同源性检测\n(基于CFG)"}</div>
       </div>
       <div className={css["button"]} onClick={() => setCurTab(BUG)}>
         <img alt="" src={curTab === BUG ? BUGICONR : BUGICON} />
@@ -110,6 +112,11 @@ function Tabbar(props) {
         <img className="exporticon" alt="" src={result ? EXPORTICONG : EXPORTICON} />
         <div>导出结果</div>
       </div>
+      <a href="https://github.com/wzru/Shavds" target="_blank">
+        <div className={css["button"]}>
+          <img alt="" src={GITHUBICON} />
+        </div>
+      </a>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import "./App.css";
 import Code from "./components/code/code";
 import File from "./components/file/file";
 import Graph from "./components/graph/graph";
+import Header from "./components/header/header";
 import Modal from "./components/modal/modal";
 import Progress from "./components/progress/progress";
 import Result from "./components/result/result";
@@ -25,6 +26,7 @@ function App() {
   });
   return (
     <div className="App">
+      <Header />
       <Modal {...modalState} dispatchModal={dispatchModal} />
       <div className="left">
         <Tabbar
