@@ -27,7 +27,7 @@ export default function Result(props) {
           allLines[bug.line - 1].style.display = "none";
           if (bugMark.className.indexOf("bug") === -1) {
             bugMark.style.display = "flex";
-            bugMark.innerHTML += BUGMAP[bug.type] + " ";
+            bugMark.innerHTML += bug.column + ":" + BUGMAP[bug.type] + " ";
           }
         });
       });

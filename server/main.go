@@ -456,7 +456,8 @@ func detect(c *gin.Context) {
 		}
 		fmt.Printf("detect res=%v\n", res)
 		lin, _ := strconv.Atoi(res[1])
-		col, _ := strconv.Atoi(res[2])
+		col, _ := strconv.Atoi(strings.Trim(res[2], "\n"))
+		// fmt.Printf("col=%v\n", col)
 		vulRes := vulRes{
 			Type: res[0],
 			Line: lin,
