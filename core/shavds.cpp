@@ -234,25 +234,12 @@ struct FunComparator : public ModulePass
         for (auto i = mfi.begin(); i != mfi.end(); ++i) {
             auto tmp = i;
             for (auto j = ++tmp; j != mfi.end(); ++j) {
-                // std::cerr << "Now compare " << i->first << " and " << j->first << "\n";
-                // for (auto i1 : i->second)
-                //     for (auto i2 = i1.bb.begin(); i2 != i1.bb.end(); ++i2)
-                //         for (auto i3 = (*i2)->begin(); i3 != (*i2)->end(); ++i3) sum1 += i3->getNumOperands();
-                // for (auto j1 : j->second)
-                //     for (auto j2 = j1.bb.begin(); j2 != j1.bb.end(); ++j2)
-                //         for (auto j3 = (*j2)->begin(; j3 != (*j2)->end(); ++j3) sum2 += j3->getNumOperands();
                 for (auto& i1 : i->second)
                     for (auto& j1 : j->second) {
                         double res = RepRate(i1.mi, j1.mi, cnt);
                         fprintf(stderr, "progress %.8lf\r", (double)cnt / s);
                         vcr.push_back(CmpRes(i1.name, j1.name, i1.mi->getInstructionCount(),
                                              j1.mi->getInstructionCount(), i1.line, j1.line, i->first, j->first, res));
-                        // std::cerr << GREEN << i1.name << RESET << " (" << i1.mi->getInstructionCount()
-                        //           << " instructions) in " << BLUE << i->first << ":" << i1.line << RESET << "\n"
-                        //           << GREEN << j1.name << RESET << " (" << j1.mi->getInstructionCount()
-                        //           << " instructions) in " << BLUE << j->first << ":" << j1.line << RESET << "\n\tare
-                        //           "
-                        //           << RED << res * 100 << "% similar!" << RESET << "\n";
                     }
             }
         }
@@ -411,9 +398,9 @@ struct Detector : public ModulePass
     Type*                          Int32Ty;
     const std::vector<std::string> BufVulFuncNames{"strcpy", "strcpy",  "strncpy", "memcpy", "strcat", "strncat",
                                                    "gets",   "getchar", "fgetc",   "getc",   "read"};
-    const std::vector<std::string> FmtVulFuncNames{"sprintf",        "vsprintf",        "sscanf",  "fscanf",
-                                                   "vfscanf",        "vscanf",          "vsscanf", "__isoc99_sscanf",
-                                                   "__isoc99_scanf", "__isoc99_sprintf", "__isoc99_printf"};
+    const std::vector<std::string> FmtVulFuncNames{
+        "sprintf", "vsprintf",        "sscanf",         "fscanf",           "vfscanf",        "vscanf",
+        "vsscanf", "__isoc99_sscanf", "__isoc99_scanf", "__isoc99_sprintf", "__isoc99_printf"};
     Detector() : ModulePass(ID) {}
     void init(Module& M)
     {
@@ -530,7 +517,18 @@ struct Detector : public ModulePass
         for (Function& F : M) {
             for (BasicBlock& B : F) {
                 for (Instruction& I : B) {
+                    // if (CallInst* call_inst = dyn_cast<CallInst>(&I)) {
+                    //     Function* fn      = call_inst->getCalledFunction();
+                    //     StringRef fn_name = fn->getName();
+                    //     errs() << fn_name << ":"
+                    //            << "\n";
+                    //     for (auto args = fn->arg_begin(); args != fn->arg_end(); ++args) {
+                    //         ConstantInt* arg = dyn_cast<ConstantInt>(&(*args));
+                    //         if (arg != NULL) errs() << arg->getValue() << "\n";
+                    //     }
+                    // }
                     for (auto op = I.op_begin(); op != I.op_end(); ++op) {
+                        // errs() << op->get()->getName() << "\n";
                         if (isIntWidthVul(op->get()->getName())) {
                             vdr.push_back(
                                 DetRes(I.getDebugLoc().getLine(), I.getDebugLoc().getCol(), "integer-width-overflow"));

@@ -428,6 +428,7 @@ func detect(c *gin.Context) {
 	name := clm.Id
 	dir := dataDir + name + "/"
 	file := dir + c.Query("file")
+	outFile := file + ".res"
 	cmd1 := exec.Command("./core/gen.sh", "-O2", "-g", "-fsanitize=implicit-integer-truncation,signed-integer-overflow,implicit-integer-sign-change,null", file)
 	out1, _ := cmd1.Output()
 	// fmt.Printf("out1=%v\n", string(out1))
@@ -435,18 +436,24 @@ func detect(c *gin.Context) {
 	ll := res[1]
 	// fmt.Printf("res=%v\n", res)
 	cmd2 := exec.Command("./core/shavds.sh", "detect", ll)
+	stderr, _ := os.OpenFile(outFile, os.O_CREATE|os.O_WRONLY, 0600)
+	cmd2.Stderr = stderr
+	defer stderr.Close()
 	data := []vulRes{}
 	// buf := make([]byte, 2048)
-	stderr, _ := cmd2.StderrPipe()
-	cmd2.Start()
-	reader := bufio.NewReader(stderr)
-	for {
-		line, err := reader.ReadString('\n')
+	// stderr, _ := cmd2.StderrPipe()
+	// cmd2.Start()
+	cmd2.Run()
+	fmt.Println(cmd2.String())
+	// reader := bufio.NewReader(stderr)
+	byts, _ := ioutil.ReadFile(outFile)
+	for _, line := range strings.Split(string(byts), "\n") {
+		// line, err := reader.ReadString('\n')
 		fmt.Printf("line=%v\n", line)
-		if err != nil || io.EOF == err {
-			fmt.Printf("err=%v\n", err)
-			break
-		}
+		// if err != nil || io.EOF == err {
+		// 	fmt.Printf("err=%v\n", err)
+		// 	break
+		// }
 		if len(line) == 0 {
 			break
 		}
@@ -457,7 +464,6 @@ func detect(c *gin.Context) {
 		fmt.Printf("detect res=%v\n", res)
 		lin, _ := strconv.Atoi(res[1])
 		col, _ := strconv.Atoi(strings.Trim(res[2], "\n"))
-		// fmt.Printf("col=%v\n", col)
 		vulRes := vulRes{
 			Type: res[0],
 			Line: lin,
@@ -465,9 +471,8 @@ func detect(c *gin.Context) {
 			File: c.Query("file"),
 		}
 		data = append(data, vulRes)
-		// time.Sleep(100)
 	}
-	cmd2.Wait()
+	// cmd2.Wait()
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"data":    data,

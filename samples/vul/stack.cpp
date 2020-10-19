@@ -9,3 +9,8 @@ int AFunc(int i, int j)
     n = j;
     return 8;
 }
+
+int BFunc(char* dst)
+{
+    strcpy(dst, "This is an overflow buffer!");
+}
